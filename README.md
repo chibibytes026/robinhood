@@ -44,6 +44,23 @@ never makes any persona sound warmer than its record earns.
 All four are fictional characters. Not the real individuals, not their opinions, not
 financial advice.
 
+## Data sources
+
+Where each persona/signal's data comes from, and what's wired vs. pending. Free-first.
+
+| Persona / signal | Data need | Source | Status |
+|---|---|---|---|
+| 📯 The Herald | market + company news | Finnhub (free) | ✅ live — nightly cron → `market_news` |
+| ⭐ Insider signal *(new)* | Form 4 insider buys | Finnhub insider transactions (free) | ⏳ next up |
+| 🧠 The Architect | 13F institutional holdings | SEC EDGAR (free) | ⬜ planned |
+| 🎯 The Oracle · 🏛️ The House | congressional trades | Finnhub congressional = **premium**; no clean free API found (S3 mirrors dead, clerk site IP-blocked) | ⛔ blocked — decision needed |
+
+Also free on Finnhub and worth pulling as *context* (not persona state): insider sentiment
+(MSPR), recommendation trends, earnings calendar/surprises, basic financials. Prices for the
+simulator come from Finnhub too. The **congressional gap** (Oracle/House) is the one
+unresolved source — pay Finnhub premium (~$12/mo), find another free feed, or keep the manual
+bootstrap.
+
 ## Layout
 
 ```
