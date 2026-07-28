@@ -2,9 +2,10 @@
 
 A **persona-driven trading research system**. It ingests free public disclosure data
 (congressional trades, SEC Form 4 insider buys, 13F institutional holdings), backtests
-those trades to compute real profit and loss, then surfaces the results through three
-fictional **trader personalities** — each modeled on a documented public trading
-*style* — that report their own track record in character.
+those trades to compute real profit and loss, then surfaces the results through fictional
+**trader personalities** that report their own track record in character. Three are
+modeled on documented public trading *styles* and speak from their backtested P&L; a
+fourth — **The Herald** — is a news-and-trend reader that carries context, not a record.
 
 It exists to make a human a sharper decision-maker. **It does not trade.**
 
@@ -22,14 +23,26 @@ It exists to make a human a sharper decision-maker. **It does not trade.**
 
 ## The personas
 
-| Slug | | Tagline | Style |
-|---|---|---|---|
-| `the_house` | 🏛️ The House | *The house always wins.* | Index-broad, bond ballast, effectively passive |
-| `the_oracle` | 🎯 The Oracle | *Patience, then the strike.* | Rare, concentrated mega-cap tech; LEAPS leverage |
-| `the_architect` | 🧠 The Architect | *Long the future, short the hype.* | Thesis barbell — long AI infra/power, short the hype |
+| Slug | | Tagline | Style | State from |
+|---|---|---|---|---|
+| `the_house` | 🏛️ The House | *The house always wins.* | Index-broad, bond ballast, effectively passive | backtested P&L |
+| `the_oracle` | 🎯 The Oracle | *Patience, then the strike.* | Rare, concentrated mega-cap tech; LEAPS leverage | backtested P&L |
+| `the_architect` | 🧠 The Architect | *Long the future, short the hype.* | Thesis barbell — long AI infra/power, short the hype | backtested P&L |
+| `the_herald` | 📯 The Herald | *The signs are written; I only read them aloud.* | News/trend reader across seven watches — the **background voice** | sign clarity, not P&L |
 
-These are **archetypes of public trading styles** — fictional characters layered on
-public filing data. Not the real individuals, not their opinions, not financial advice.
+The first three are **archetypes of public trading styles** — fictional characters layered
+on public filing data, their register (`winning` / `losing` / `stagnant`) set by computed P&L.
+
+**The Herald is different.** It runs no backtest: it reads the month's headlines across seven
+watches (energy · war · power · AI · media · mergers · stocks), crosses them against the
+watchlists and live holdings, and proclaims the **Anointed** (gather) and the **Cast Out**
+(cut). With no ledger to stand on, it is the **quietest, lowest-weight voice by design** — its
+state (`clarion` / `murk` / `silence`) reflects only how clearly the signs align, and its own
+scripture tells you to *weigh, not obey*. News feeds **data/context, never voice**: a headline
+never makes any persona sound warmer than its record earns.
+
+All four are fictional characters. Not the real individuals, not their opinions, not
+financial advice.
 
 ## Layout
 
