@@ -33,9 +33,13 @@ Raw headlines above it stay objective and sourced.
 
 ## How it's filled
 
-- **Interactive (now):** pulled via Composio `COMPOSIO_SEARCH_NEWS` across the seven watches.
-- **Pipeline (planned):** Finnhub `/news` (general) + `/company-news` for watchlist tickers,
-  free + headless, appended daily on the Railway cron.
+- **Production (automated):** the Railway nightly cron `ingest/news.py` pulls Finnhub (market
+  + company news) and GDELT (thematic world news across the seven watches) into the Supabase
+  **`market_news`** table. That table — not this markdown — is the runtime source of truth the
+  bots query via MCP. See `railway.toml`.
+- **This markdown archive:** the manual/human-readable bootstrap (built interactively via
+  Composio `COMPOSIO_SEARCH_NEWS`). Kept for the seeded month; superseded at runtime by
+  `market_news`.
 
 ## Coverage status
 

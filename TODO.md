@@ -21,7 +21,7 @@ Check the box, commit, move on.
 - [x] Create Supabase project (or reuse existing) — `robinhood-personas` (ref ufkaoyvdhicwdwbckutx)
 - [x] Run `schema.sql` in the SQL editor
 - [x] Verify all 12 tables + the 3 seeded personas exist
-- [ ] `db/client.py` — supabase-py wrapper, reads creds from env
+- [x] `db/client.py` — supabase-py wrapper, reads creds from env
 - [x] Confirm Claude can read the tables through the Supabase MCP
 - [x] Enable RLS or keep service-role key server-side only — RLS enabled on all 12 tables, no policies (service-role bypasses)
 

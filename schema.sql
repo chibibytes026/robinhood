@@ -258,6 +258,28 @@ create table if not exists watchlist_signals (
 
 create index if not exists idx_signals_score on watchlist_signals(score desc, created_at desc);
 
+-- Runtime news feed. Populated nightly by the Railway cron (ingest/news.py) from
+-- Finnhub (market + company news) and GDELT (thematic world news across the seven
+-- watches). The personas query THIS at runtime via MCP — it is the automated source
+-- of truth for headlines; the markdown archive under personas/the_herald/headlines/
+-- was the manual bootstrap.
+create table if not exists market_news (
+  id            bigint generated always as identity primary key,
+  watch         text,                 -- energy|war|power|ai|media|mergers|stocks (nullable)
+  ticker        text,                 -- optional loose tag (no FK; news can name any symbol)
+  headline      text not null,
+  summary       text,
+  source        text,                 -- publisher / domain
+  url           text unique,          -- dedup key for upsert
+  published_at  timestamptz,
+  source_api    text,                 -- finnhub_general | finnhub_company | gdelt
+  ingested_at   timestamptz default now()
+);
+
+create index if not exists idx_market_news_published on market_news(published_at desc);
+create index if not exists idx_market_news_watch on market_news(watch, published_at desc);
+create index if not exists idx_market_news_ticker on market_news(ticker, published_at desc);
+
 
 -- ------------------------------------------------------------
 -- LAYER 6: OPS
@@ -332,4 +354,5 @@ alter table public.persona_performance    enable row level security;
 alter table public.persona_calls          enable row level security;
 alter table public.persona_reports        enable row level security;
 alter table public.watchlist_signals      enable row level security;
+alter table public.market_news            enable row level security;
 alter table public.ingest_runs            enable row level security;
