@@ -52,14 +52,17 @@ TICKER_WATCH = {
 }
 
 # GDELT full-text queries per watch. English-only; recency handled by timespan.
+# Halved from 6 to 3 requests to stay under GDELT's aggressive rate limit — the
+# overlapping watches are merged so 3 calls still span energy/power/war/media/
+# mergers. Finnhub already covers the AI/stocks side via ticker news. Re-expand
+# once we confirm this pulls cleanly.
 GDELT_QUERIES = {
-    "energy":  '(oil OR OPEC OR "natural gas" OR crude OR gasoline)',
+    "energy":  '(oil OR OPEC OR crude OR "natural gas" OR electricity OR "power grid" OR nuclear)',
     "war":     '(war OR geopolitics OR military OR conflict OR ceasefire)',
-    "power":   '("power grid" OR electricity OR nuclear OR utility OR "data center power")',
-    "ai":      '("artificial intelligence" OR "data center" OR semiconductor OR "AI chip")',
-    "media":   '(streaming OR "media merger" OR Hollywood OR entertainment)',
-    "mergers": '(merger OR acquisition OR takeover OR buyout)',
+    "mergers": '(merger OR acquisition OR takeover OR buyout OR streaming OR Hollywood)',
 }
+GDELT_UA = "robinhood-personas/1.0 (market research; jj@dulcenochemedia.com)"
+GDELT_SLEEP = 6.0  # seconds between GDELT calls (its limit is ~1 req / 5s)
 
 
 def _utc_iso(unix_ts) -> str | None:
@@ -128,18 +131,19 @@ def fetch_finnhub_company(token: str, symbol: str, days: int) -> list[dict]:
 
 
 def fetch_gdelt(watch: str, query: str, timespan: str) -> list[dict]:
-    r = requests.get(
-        GDELT_DOC,
-        params={
-            "query": f"{query} sourcelang:eng",
-            "mode": "ArtList",
-            "maxrecords": GDELT_MAX,
-            "timespan": timespan,
-            "sort": "DateDesc",
-            "format": "json",
-        },
-        timeout=HTTP_TIMEOUT,
-    )
+    params = {
+        "query": f"{query} sourcelang:eng",
+        "mode": "ArtList",
+        "maxrecords": GDELT_MAX,
+        "timespan": timespan,
+        "sort": "DateDesc",
+        "format": "json",
+    }
+    # GDELT 429s aggressively; identify with a UA and retry once after a longer wait.
+    r = requests.get(GDELT_DOC, params=params, headers={"User-Agent": GDELT_UA}, timeout=HTTP_TIMEOUT)
+    if r.status_code == 429:
+        time.sleep(12)
+        r = requests.get(GDELT_DOC, params=params, headers={"User-Agent": GDELT_UA}, timeout=HTTP_TIMEOUT)
     r.raise_for_status()
     out = []
     for a in (r.json() or {}).get("articles", []):
@@ -222,7 +226,7 @@ def main() -> None:
     for watch, query in GDELT_QUERIES.items():
         try:
             rows += fetch_gdelt(watch, query, timespan)
-            time.sleep(1.0)  # be polite to GDELT
+            time.sleep(GDELT_SLEEP)  # stay under GDELT's rate limit
         except Exception as e:  # noqa: BLE001
             errors.append(f"gdelt:{watch}: {e}")
             log.warning("gdelt %s failed: %s", watch, e)
