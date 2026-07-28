@@ -314,7 +314,8 @@ insert into securities (ticker, name, sector, asset_type) values
   ('META',  'Meta Platforms Inc',     'Communication', 'equity'),
   ('AVGO',  'Broadcom Inc',           'Technology',    'equity'),
   ('VOO',   'Vanguard S&P 500 ETF',   'Index',         'etf'),
-  ('SPY',   'SPDR S&P 500 ETF Trust', 'Index',         'etf')
+  ('SPY',   'SPDR S&P 500 ETF Trust', 'Index',         'etf'),
+  ('SONY',  'Sony Group Corp (ADR)',  'Technology',    'equity')
 on conflict (ticker) do nothing;
 
 

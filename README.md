@@ -56,10 +56,16 @@ Where each persona/signal's data comes from, and what's wired vs. pending. Free-
 | 🎯 The Oracle · 🏛️ The House | congressional trades | Finnhub congressional = **premium**; no clean free API found (S3 mirrors dead, clerk site IP-blocked) | ⛔ blocked — decision needed |
 
 Also free on Finnhub and worth pulling as *context* (not persona state): insider sentiment
-(MSPR), recommendation trends, earnings calendar/surprises, basic financials. Prices for the
-simulator come from Finnhub too. The **congressional gap** (Oracle/House) is the one
-unresolved source — pay Finnhub premium (~$12/mo), find another free feed, or keep the manual
-bootstrap.
+(MSPR), recommendation trends, earnings calendar/surprises, basic financials. The
+**congressional gap** (Oracle/House) is the one unresolved source — pay Finnhub premium
+(~$12/mo), find another free feed, or keep the manual bootstrap.
+
+> ⭐ **The major next step for the backtested personas: price history from Finnhub.**
+> The winners/losers simulation — the thing that turns The House / Oracle / Architect from
+> voices-without-a-record into real, stateful personas — needs historical daily OHLC
+> (`stock candles` → `price_history`). It's a big build, deliberately deferred until all
+> personas and their data feeds exist. Nothing about the backtest → state → voice chain works
+> until this lands, so it's the single biggest item on the TODO.
 
 ## Layout
 

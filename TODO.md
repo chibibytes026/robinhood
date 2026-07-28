@@ -55,7 +55,9 @@ Start with **insider Form 4** — highest signal, lowest noise.
 
 ## Phase 4 — Remaining ingestion
 
-- [ ] `ingest/finnhub_prices.py` → `price_history` (needed by the sim — do this next)
+- [ ] ⭐ **MAJOR / biggest item:** `ingest/finnhub_prices.py` → `price_history` (Finnhub `stock candles`).
+      This is the single prerequisite for the winners/losers simulation — the backtest → state →
+      voice chain does nothing until historical OHLC exists. Deferred until all personas + feeds land.
 - [ ] Backfill 2 years of daily OHLC for every watchlist ticker + SPY
 - [ ] `ingest/congress.py` → `congress_trades` (parse amount ranges → low/high/midpoint)
 - [ ] `ingest/edgar_13f.py` → `institutional_holdings` (handle put/call legs separately)
