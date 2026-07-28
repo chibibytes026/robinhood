@@ -259,10 +259,10 @@ create table if not exists watchlist_signals (
 create index if not exists idx_signals_score on watchlist_signals(score desc, created_at desc);
 
 -- Runtime news feed. Populated nightly by the Railway cron (ingest/news.py) from
--- Finnhub (market + company news) and GDELT (thematic world news across the seven
--- watches). The personas query THIS at runtime via MCP — it is the automated source
--- of truth for headlines; the markdown archive under personas/the_herald/headlines/
--- was the manual bootstrap.
+-- Finnhub (market + per-ticker company news). The personas query THIS at runtime via
+-- MCP — it is the automated source of truth for headlines; the markdown archive under
+-- personas/the_herald/headlines/ was the manual bootstrap. (A thematic world-news
+-- source for the non-finance watches is TBD — GDELT was dropped, it blocks cloud IPs.)
 create table if not exists market_news (
   id            bigint generated always as identity primary key,
   watch         text,                 -- energy|war|power|ai|media|mergers|stocks (nullable)

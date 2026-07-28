@@ -1,18 +1,18 @@
 """Nightly news ingestion for the persona bots.
 
 Runs headless on Railway (cron) — no browser, all HTTP, no brokerage credentials.
-Pulls free news:
-  - Finnhub  : general market news + per-watchlist-ticker company news (free tier, key)
-  - GDELT    : thematic world news across the seven watches (energy, war, power, ai,
-               media, mergers) — keyless, free.
+Pulls free news from Finnhub: general market news + per-watchlist-ticker company news.
 
 Normalizes and upserts into Supabase `market_news` (dedup on url), then writes an
 `ingest_runs` audit row. The personas read `market_news` at runtime via MCP.
 
+NOTE: GDELT was removed — it blocks Railway's datacenter IP (429 on the first
+request regardless of spacing). A keyless, server-friendly thematic-news source for
+the non-finance watches (energy/war/media/mergers) is TBD; see the repo notes.
+
 Env:
   SUPABASE_URL, SUPABASE_SERVICE_KEY   (required)
   FINNHUB_API_KEY                      (optional; Finnhub sources skipped if unset)
-  NEWS_TIMESPAN        default "24H"    (GDELT lookback window)
   NEWS_LOOKBACK_DAYS   default "1"      (Finnhub company-news lookback)
 
 Run:  python -m ingest.news
@@ -32,9 +32,7 @@ log = logging.getLogger("ingest.news")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 FINNHUB_BASE = "https://finnhub.io/api/v1"
-GDELT_DOC = "https://api.gdeltproject.org/api/v2/doc/doc"
 HTTP_TIMEOUT = 30
-GDELT_MAX = 50
 
 # Watchlist tickers (mirror the securities seed). Company news is pulled per ticker.
 WATCHLIST = [
@@ -51,32 +49,11 @@ TICKER_WATCH = {
     "AAPL": "stocks", "SPY": "stocks", "VOO": "stocks",
 }
 
-# GDELT full-text queries per watch. English-only; recency handled by timespan.
-# Halved from 6 to 3 requests to stay under GDELT's aggressive rate limit — the
-# overlapping watches are merged so 3 calls still span energy/power/war/media/
-# mergers. Finnhub already covers the AI/stocks side via ticker news. Re-expand
-# once we confirm this pulls cleanly.
-GDELT_QUERIES = {
-    "energy":  '(oil OR OPEC OR crude OR "natural gas" OR electricity OR "power grid" OR nuclear)',
-    "war":     '(war OR geopolitics OR military OR conflict OR ceasefire)',
-    "mergers": '(merger OR acquisition OR takeover OR buyout OR streaming OR Hollywood)',
-}
-GDELT_UA = "robinhood-personas/1.0 (market research; jj@dulcenochemedia.com)"
-GDELT_SLEEP = 6.0  # seconds between GDELT calls (its limit is ~1 req / 5s)
-
 
 def _utc_iso(unix_ts) -> str | None:
     try:
         return datetime.fromtimestamp(int(unix_ts), tz=timezone.utc).isoformat()
     except (ValueError, TypeError, OSError):
-        return None
-
-
-def _gdelt_date(seen: str) -> str | None:
-    # GDELT seendate looks like "20260728T183000Z"
-    try:
-        return datetime.strptime(seen, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc).isoformat()
-    except (ValueError, TypeError):
         return None
 
 
@@ -130,38 +107,6 @@ def fetch_finnhub_company(token: str, symbol: str, days: int) -> list[dict]:
     return out
 
 
-def fetch_gdelt(watch: str, query: str, timespan: str) -> list[dict]:
-    params = {
-        "query": f"{query} sourcelang:eng",
-        "mode": "ArtList",
-        "maxrecords": GDELT_MAX,
-        "timespan": timespan,
-        "sort": "DateDesc",
-        "format": "json",
-    }
-    # GDELT 429s aggressively; identify with a UA and retry once after a longer wait.
-    r = requests.get(GDELT_DOC, params=params, headers={"User-Agent": GDELT_UA}, timeout=HTTP_TIMEOUT)
-    if r.status_code == 429:
-        time.sleep(12)
-        r = requests.get(GDELT_DOC, params=params, headers={"User-Agent": GDELT_UA}, timeout=HTTP_TIMEOUT)
-    r.raise_for_status()
-    out = []
-    for a in (r.json() or {}).get("articles", []):
-        if not a.get("url"):
-            continue
-        out.append({
-            "watch": watch,
-            "ticker": None,
-            "headline": a.get("title"),
-            "summary": None,
-            "source": a.get("domain"),
-            "url": a.get("url"),
-            "published_at": _gdelt_date(a.get("seendate")),
-            "source_api": "gdelt",
-        })
-    return out
-
-
 def dedup(rows: list[dict]) -> list[dict]:
     seen: set[str] = set()
     out: list[dict] = []
@@ -189,14 +134,12 @@ def main() -> None:
     started = time.time()
     client = get_client()
     token = os.environ.get("FINNHUB_API_KEY")
-    timespan = os.environ.get("NEWS_TIMESPAN", "24H")
     days = int(os.environ.get("NEWS_LOOKBACK_DAYS", "1"))
 
     rows: list[dict] = []
     errors: list[str] = []
 
-    log.info("news ingest starting; finnhub_key=%s timespan=%s lookback=%sd",
-             bool(token), timespan, days)
+    log.info("news ingest starting; finnhub_key=%s lookback=%sd", bool(token), days)
     try:
         probe = client.table("securities").select("ticker").limit(1).execute()
         log.info("supabase reachable; securities probe rows=%d", len(probe.data or []))
@@ -221,15 +164,6 @@ def main() -> None:
     else:
         log.warning("FINNHUB_API_KEY unset — skipping Finnhub sources")
         errors.append("finnhub: FINNHUB_API_KEY unset")
-
-    # --- GDELT (thematic, keyless) ---
-    for watch, query in GDELT_QUERIES.items():
-        try:
-            rows += fetch_gdelt(watch, query, timespan)
-            time.sleep(GDELT_SLEEP)  # stay under GDELT's rate limit
-        except Exception as e:  # noqa: BLE001
-            errors.append(f"gdelt:{watch}: {e}")
-            log.warning("gdelt %s failed: %s", watch, e)
 
     rows = dedup(rows)
 
