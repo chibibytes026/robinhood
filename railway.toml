@@ -14,7 +14,9 @@ builder = "NIXPACKS"
 
 [deploy]
 startCommand = "python -m ingest.news"
-# 06:00 UTC nightly (~1-2am ET) — after the US close and the overnight news cycle.
-cronSchedule = "0 6 * * *"
+# Cron schedule is managed in the Railway service config (set via API / dashboard):
+#   0 6 * * *   — 06:00 UTC nightly (~1-2am ET), after the US close + overnight news.
+# Deliberately NOT set here: a config-file cron overrides dashboard changes on every
+# deploy, which blocks one-off manual runs. Keep the schedule in the service config.
 # Cron job: run once and exit; do not restart on completion.
 restartPolicyType = "NEVER"
