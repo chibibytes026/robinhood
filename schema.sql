@@ -87,6 +87,21 @@ from securities s
 where s.form4_eligible and s.ever_traded
   and not exists (select 1 from insider_trades i where i.ticker = s.ticker);
 
+-- Insider-persona signal notes, stored as queryable schema metadata.
+comment on table insider_trades is
+ 'Raw SEC Form 4 insider transactions (source: Finnhub). Insider-persona signal rules: code P '
+ '(open-market purchase) is the ONLY real conviction tell; S/A/M/F are noise. Cluster > lone; '
+ 'CEO/CFO > director > VP (rank needs SEC Form 4 directly — Finnhub omits title); buying into '
+ 'weakness > strength; strip 10b5-1 scheduled trades. Delayed (~2-day filing lag), incomplete '
+ '— thematic conviction, not a live signal.';
+comment on view insider_buys is
+ 'The Insider daily report: open-market purchases only (code P, positive shares) — the '
+ 'conviction subset of insider_trades.';
+comment on view insider_coverage_gaps is
+ 'US Form-4 stocks we have traded that returned NO insider data. The Insider persona reads this '
+ 'to flag an incomplete report and request a refresh (depends on securities.form4_eligible + '
+ 'ever_traded).';
+
 -- House/Senate clerk STOCK Act filings. Amounts are RANGES, not exact.
 create table if not exists congress_trades (
   id              bigint generated always as identity primary key,
@@ -357,6 +372,14 @@ insert into personas (slug, display_name, tagline, style_summary, source_type, s
   ('the_architect', 'The Architect', 'Long the future, short the hype.',
    'Thesis barbell: long AI infrastructure and power, hedged with puts against overheated chip names. Multi-year conviction.',
    'institutional', 'Situational Awareness LP')
+on conflict (slug) do nothing;
+
+-- The Insider — signal-stage persona (active=false until it has a backtested record).
+-- (The Herald [news] and The Empath [meta] are also registered in the live DB.)
+insert into personas (slug, display_name, tagline, style_summary, source_type, source_key, active) values
+  ('the_insider', 'The Insider', 'The ones who know, buy.',
+   'Follows corporate insiders'' open-market PURCHASES (SEC Form 4 code P) — the highest-conviction tell. Weights clusters over lone buys, CEO/CFO over director/VP, and buying into weakness over strength; ignores S/A/M grants & exercises and 10b5-1 scheduled trades. US operating companies only (ETFs/ADRs have no insiders). Data: Finnhub insider transactions (free tier, ~2-day filing lag, incomplete, no title field). Flags US traded stocks missing from the report via insider_coverage_gaps and asks for a refresh. Signal-stage: not yet a backtested live persona.',
+   'insider', null, false)
 on conflict (slug) do nothing;
 
 
