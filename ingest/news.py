@@ -191,6 +191,15 @@ def main() -> None:
     rows: list[dict] = []
     errors: list[str] = []
 
+    log.info("news ingest starting; finnhub_key=%s timespan=%s lookback=%sd",
+             bool(token), timespan, days)
+    try:
+        probe = client.table("securities").select("ticker").limit(1).execute()
+        log.info("supabase reachable; securities probe rows=%d", len(probe.data or []))
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"supabase_probe: {e}")
+        log.error("SUPABASE PROBE FAILED: %s", e)
+
     # --- Finnhub (finance + per-ticker) ---
     if token:
         try:
@@ -250,6 +259,11 @@ def main() -> None:
         "news ingest %s: %d rows upserted in %d ms (%d source errors)",
         status, inserted, duration_ms, len(errors),
     )
+    for e in errors:
+        log.error("error: %s", e)
+    if inserted == 0:
+        # Surface a no-op run as a FAILED deployment so it isn't silently green.
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
