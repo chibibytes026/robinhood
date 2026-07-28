@@ -174,6 +174,17 @@ def main() -> None:
         errors.append(f"upsert: {e}")
         log.error("upsert failed: %s", e)
 
+    # Retention: keep a rolling ~3-month window. Anything older is deleted every
+    # night, so even backfilled rows never persist past the window.
+    retention_days = int(os.environ.get("NEWS_RETENTION_DAYS", "90"))
+    try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=retention_days)).isoformat()
+        res = client.table("market_news").delete().lt("published_at", cutoff).execute()
+        log.info("retention: deleted %d rows older than %d days", len(res.data or []), retention_days)
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"retention: {e}")
+        log.warning("retention delete failed: %s", e)
+
     if inserted and not errors:
         status = "ok"
     elif inserted:
