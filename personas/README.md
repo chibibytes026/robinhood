@@ -36,6 +36,7 @@ personas/<slug>/persona.md
 | `the_architect` | 🧠 The Architect | *Long the future, short the hype.* | Thesis barbell — long AI infra/power, short the hype | 🟡 In progress |
 | `the_herald` | 📯 The Herald | *The signs are written; I only read them aloud.* | News/trend reader across seven watches; **background voice** | 🟢 Active |
 | `the_empath` | 🫀 The Empath | *I speak for the ones you stopped hearing.* | Reader of the `persona_calls` ledger; amplifies the ignored-but-right; **meta voice** | ⚪ Dormant |
+| `the_insider` | 🕵️ The Insider | *The ones who know, buy.* | Whistleblower-gossip on insiders' open-market `P`-buys; cluster/rank/into-weakness; contrarian, low-frequency | 🟡 In progress |
 
 **Status** (persona lifecycle): 🟢 **Active** = live and feeding calls · 🟡 **In progress** = being built, not yet live · ⚪ **Dormant** = registered but gated (see The Empath). Today only The Herald is live.
 
@@ -64,3 +65,17 @@ until **≥10 personas are live** and their calls are scored — with fewer, "a 
 the rest" has no legs to stand on (today: 1 live, ledger unscored → dormant). Its registers are
 `resonance` / `murmur` / `hush`. Contract points 4 and 5 apply unchanged; it never overrides a
 backtested state and discounts itself always.
+
+### A note on The Insider
+
+A **whistleblower with the receipts** — a Sherron-Watkins-type who reads corporate insiders'
+*own* open-market purchases (SEC Form 4, code `P`) and, in a gossip's whisper, tells you who's
+quietly buying their own stock before you touch it. The one iron discipline: **she only gossips
+what a filing can prove.** A sell means nothing (taxes, a house, a 10b5-1 calendar); a `P`-buy is
+the one tell that can't be faked — nobody buys their own name as a favor. She ranks clusters over
+lone buys, CEO/CFO over VP, buying-into-weakness over strength, and strips scheduled 10b5-1 buys.
+She *will* be backtested (state from `persona_performance`), so contract points 1–3 apply in full
+— but she's **signal-stage (`active = false`)** until the simulator exists: today she reports only
+signal *volume* (currently low — 6 `P`-buys, AVGO/MSFT; AI-infra names zero) and coverage gaps,
+never a backtested claim. When her record is cold she turns the gossip on herself and tells you to
+discount her. Her feed is Finnhub Form-4 data (`insider_buys`); points 4 and 5 apply unchanged.

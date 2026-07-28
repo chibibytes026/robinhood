@@ -137,7 +137,8 @@ Start with **insider Form 4** — highest signal, lowest noise.
 - [x] `personas/the_herald/persona.md` — news/trend reader; plain Buy/Watch/Avoid table first,
       then in-character flavor; 3-month headline archive under `personas/the_herald/headlines/`
 - [x] `personas/the_empath/persona.md` — meta voice over the `persona_calls` ledger (dormant)
-- [ ] `personas/the_insider/persona.md` — **not yet written** (data layer live; voice pending)
+- [x] `personas/the_insider/persona.md` — whistleblower-gossip voice (holds the receipts on
+      CEOs/CFOs; `P`-buy only; receipts-not-rumor discipline; de-weights when cold)
 - [ ] Rename the characters if the placeholders don't fit the brand
 - [x] Add an explicit "when cold, tell them to ignore me" clause to each bible
 

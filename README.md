@@ -63,8 +63,11 @@ Finnhub feed is **live** (`insider_trades` → the `insider_buys` P-only report 
 **AVGO** and **MSFT**, while every AI-infra name (NVDA, CRWV, VST, CEG, BE…) showed *zero* insider
 buying. So it's a **low-frequency, contrarian** voice by design — quiet unless real inside money
 moves, and currently whispering "AVGO" while the crowd shouts "NVDA." It has data but no
-backtested record yet, so it's signal-stage (`active=false`) until the simulator exists. No voice
-bible written yet.
+backtested record yet, so it's signal-stage (`active=false`) until the simulator exists. Its
+voice is a **whistleblower's gossip** — a Sherron-Watkins-type who holds the receipts on the
+CEOs and CFOs and leans across the table to tell you who's quietly buying their own stock before
+you touch it — but she only ever gossips what a filing can prove, and de-weights herself when her
+record's cold. See [`personas/the_insider/persona.md`](./personas/the_insider/persona.md).
 
 All six are fictional characters. Not the real individuals, not their opinions, not
 financial advice.
