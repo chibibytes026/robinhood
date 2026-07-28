@@ -41,9 +41,12 @@ Raw headlines above it stay objective and sourced.
 
 | Week | Dates | Status |
 |---|---|---|
-| 2026-W31 | Jul 27 – Aug 2 | 🟢 seeded (Jul 28 complete, 7 watches) |
-| 2026-W27–W30 | Jul 1 – Jul 26 | ⚪ to backfill |
+| 2026-W31 | Jul 27 – Aug 2 | 🟢 Jul 27–28 (7 watches) |
+| 2026-W30 | Jul 20 – Jul 26 | 🟢 backfilled |
+| 2026-W29 | Jul 13 – Jul 19 | 🟢 backfilled |
+| 2026-W28 | Jul 6 – Jul 12 | 🟢 backfilled |
+| 2026-W27 | Jun 29 – Jul 5 | 🟢 backfilled (sparser) |
 
-> The Herald's read is only as good as its month. Until W27–W30 are backfilled, it is reading
-> a partial month and **must say so** — a herald that proclaims a trend from three days of
-> headlines is exactly the noise-crowning failure the system guards against.
+> Backfilled from a past-month news pull, so density thins the further back it runs (W27 is
+> sparse). Good enough for a *directional* read of the month; not a complete record. The
+> Herald still has **no scored ledger**, so it reads with discount regardless.
