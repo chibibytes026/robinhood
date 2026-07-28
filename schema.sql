@@ -19,11 +19,13 @@
 -- ------------------------------------------------------------
 
 create table if not exists securities (
-  ticker      text primary key,
-  name        text,
-  sector      text,
-  asset_type  text default 'equity',   -- equity | etf
-  created_at  timestamptz default now()
+  ticker         text primary key,
+  name           text,
+  sector         text,
+  asset_type     text default 'equity',   -- equity | etf
+  form4_eligible boolean default true,     -- files SEC Form 4? false for ETFs / foreign ADRs
+  ever_traded    boolean default false,    -- have we bought/sold it in the agentic account
+  created_at     timestamptz default now()
 );
 
 -- Daily OHLCV. This is what the simulator reads. Source: Finnhub / EDGAR-adjacent
@@ -66,6 +68,24 @@ create table if not exists insider_trades (
 
 create index if not exists idx_insider_ticker_date on insider_trades(ticker, trade_date desc);
 create index if not exists idx_insider_code on insider_trades(txn_code);
+
+-- The daily insider report: open-market PURCHASES only (code 'P') — the real
+-- conviction tell. Everything else (S/A/M/F) stays in insider_trades, unused.
+-- security_invoker=true so the view respects the base table's RLS.
+create or replace view insider_buys with (security_invoker = true) as
+select ticker, insider_name, shares, price, value_usd, trade_date, filed_date, source
+from insider_trades
+where txn_code = 'P' and shares > 0
+order by trade_date desc;
+
+-- Coverage gaps: US Form-4 stocks we've TRADED that returned NO insider data.
+-- The insider persona reads this to flag tickers whose report looks incomplete
+-- and request a refresh (depends on securities.form4_eligible + ever_traded).
+create or replace view insider_coverage_gaps with (security_invoker = true) as
+select s.ticker, s.name, s.sector
+from securities s
+where s.form4_eligible and s.ever_traded
+  and not exists (select 1 from insider_trades i where i.ticker = s.ticker);
 
 -- House/Senate clerk STOCK Act filings. Amounts are RANGES, not exact.
 create table if not exists congress_trades (
@@ -317,6 +337,10 @@ insert into securities (ticker, name, sector, asset_type) values
   ('SPY',   'SPDR S&P 500 ETF Trust', 'Index',         'etf'),
   ('SONY',  'Sony Group Corp (ADR)',  'Technology',    'equity')
 on conflict (ticker) do nothing;
+
+-- Form-4 eligibility + traded flags (ETFs/ADRs don't file Form 4).
+update securities set form4_eligible = false where asset_type = 'etf' or ticker = 'SONY';
+update securities set ever_traded    = true  where ticker in ('CRWV','SPY','SONY','GOOGL','BE');
 
 
 -- ------------------------------------------------------------

@@ -87,6 +87,7 @@ def main() -> None:
 
     total = 0
     per_ticker: dict[str, int] = {}
+    all_rows: list[dict] = []
     errors: list[str] = []
 
     for sym in SYMBOLS:
@@ -94,6 +95,7 @@ def main() -> None:
             data = fetch_insider(token, sym)
             rows = to_rows(sym, data)
             per_ticker[sym] = len(rows)
+            all_rows += rows
             if rows:
                 client.table("insider_trades").upsert(
                     rows,
@@ -113,6 +115,16 @@ def main() -> None:
     log.info("RELEVANCE: %d/%d symbols have insider data", len(have), len(SYMBOLS))
     log.info("  with data : %s", ", ".join(f"{s}={per_ticker[s]}" for s in have))
     log.info("  empty     : %s", ", ".join(none))
+
+    # The daily report is PURCHASES only (code 'P', positive shares) — the real
+    # conviction tell. Everything else (S/A/M/F) stays in the raw table, unused.
+    buys = [r for r in all_rows if r.get("txn_code") == "P" and (r.get("shares") or 0) > 0]
+    log.info("PURCHASES (P): %d buys across %d tickers",
+             len(buys), len({r["ticker"] for r in buys}))
+    for r in sorted(buys, key=lambda x: (x.get("trade_date") or ""), reverse=True)[:25]:
+        log.info("  BUY %-5s %s  +%s sh @ %s  ($%s)  %s",
+                 r["ticker"], r.get("insider_name"), r.get("shares"),
+                 r.get("price"), r.get("value_usd"), r.get("trade_date"))
 
     status = "ok" if not errors else ("partial" if total else "failed")
     duration_ms = int((time.time() - started) * 1000)
