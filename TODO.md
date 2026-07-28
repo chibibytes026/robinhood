@@ -5,6 +5,38 @@ Check the box, commit, move on.
 
 ---
 
+## Where we are now (2026-07-28)
+
+Progress so far, out of phase order because the build has front-loaded the persona + data
+layers ahead of the simulator:
+
+- **Phase 0–1 done.** Repo skeleton, `schema.sql`, `.env.example`, `db/client.py`; Supabase
+  project `robinhood-personas` live with RLS on all tables (no policies — service-role
+  bypasses in the proof-of-concept phase). Schema has grown well past the original 12 tables:
+  `market_news`, `persona_calls` (the "you should have listened" ledger), `insider_trades`,
+  plus the `insider_buys` and `insider_coverage_gaps` views and `securities.form4_eligible` /
+  `ever_traded` flags — all documented with `COMMENT ON`.
+- **Six personas registered** (was three): 🏛️ The House, 🎯 The Oracle, 🧠 The Architect,
+  📯 **The Herald** (news/trend reader — the only *live* voice, plain Buy/Watch/Avoid table
+  first, then flavor; 3-month headline archive), 🫀 **The Empath** (meta voice reading the
+  `persona_calls` ledger — dormant until ≥10 live personas), 🕵️ **The Insider** (Form-4
+  `P`-buy follower — data live, no voice bible yet). See `README.md` for the full status table.
+- **Ingestion live on Railway** (not EDGAR-first as originally planned — Finnhub-first, since
+  it's the one source Railway's network can reach; Finnhub is 403-blocked from the agent
+  session). `ingest/daily.py` runs `news` + `insider` nightly → `market_news` /
+  `insider_trades`. News has a rolling **3-month retention** (`NEWS_RETENTION_DAYS`, we never
+  backfill past 90 days). GDELT was tried and removed (blocks Railway datacenter IPs, 429).
+- **Insider relevance tested:** high coverage (11 US watchlist names), low signal — only **6
+  open-market `P`-buys** across ~5,100 recent transactions, clustered in AVGO/MSFT; every
+  AI-infra name (NVDA, CRWV, VST, CEG, BE) showed zero insider buying. Confirms The Insider is
+  a low-frequency, contrarian voice by design.
+- **Human-approved execution validated** in the ring-fenced agentic account (see Never, below).
+- **The big remaining blocker is `price_history`** (Finnhub stock candles, Phase 4) — nothing
+  in the backtest → state → voice chain runs until it lands, so the three backtested personas
+  are still voices-without-a-record. That's the single biggest open item.
+
+---
+
 ## Phase 0 — Repo foundation
 
 - [x] Commit `schema.sql`, `ARCHITECTURE.md`, `TODO.md`
@@ -29,10 +61,12 @@ Check the box, commit, move on.
 
 ## Phase 2 — Accounts & keys (free tier only)
 
-- [ ] Finnhub account → API key → `.env`
+- [x] Finnhub account → API key → Railway service env (`FINNHUB_API_KEY`)
 - [ ] SEC EDGAR: no key, but set a descriptive `User-Agent` (they block generic ones)
-- [ ] Railway account, project created
-- [ ] GitHub → Railway deploy hook connected
+- [x] Railway account, project created — `serene-friendship`, nightly `ingest.daily` cron
+- [x] GitHub → Railway auto-deploy connected (GitHub App installed + environment connected to
+      branch `claude/reference-files-review-nb9y1i`). Composio is the fallback control path
+      when the native Railway MCP drops.
 - [ ] Anthropic API key (for report generation) → `.env`
 
 > Skip paid APIs entirely for now. Revisit FMP (~$19/mo, **includes commercial rights**)
@@ -44,12 +78,17 @@ Check the box, commit, move on.
 
 Start with **insider Form 4** — highest signal, lowest noise.
 
-- [ ] `ingest/edgar_form4.py` — pull recent Form 4s
-- [ ] Parse: ticker, insider, title, txn_code, shares, price, dates
-- [ ] Filter to `txn_code = 'P'` (real open-market buys only)
-- [ ] Upsert to `insider_trades`, dedupe on the unique constraint
-- [ ] Write an `ingest_runs` audit row
-- [ ] **Checkpoint:** real rows visible in Supabase. Stop and verify before continuing.
+> **Pivot (2026-07):** the source is **Finnhub `/stock/insider-transactions`, not EDGAR** —
+> Finnhub is the one feed Railway's network can reach, and its Form-4 data is pre-parsed. The
+> pull is `ingest/insider.py`, wired into `ingest/daily.py`. EDGAR is deferred to Phase 4 (13F).
+
+- [x] `ingest/insider.py` — pull recent Form 4s (Finnhub, per watchlist + traded ticker)
+- [x] Parse: ticker, insider, txn_code, shares, price, dates (Finnhub omits `title`)
+- [x] Filter/report `txn_code = 'P'` (real open-market buys) via the `insider_buys` view
+- [x] Upsert to `insider_trades`, dedupe on the unique constraint
+- [x] Coverage-gap detection (`insider_coverage_gaps`) so the persona asks for a refresh when a
+      US traded ticker is missing
+- [x] **Checkpoint:** real rows visible in Supabase (nightly Railway cron). Verified.
 
 ---
 
@@ -95,6 +134,10 @@ Start with **insider Form 4** — highest signal, lowest noise.
 - [x] `personas/the_oracle/persona.md` — voice, style rules, tells, 3 streak registers
 - [x] `personas/the_house/persona.md`
 - [x] `personas/the_architect/persona.md`
+- [x] `personas/the_herald/persona.md` — news/trend reader; plain Buy/Watch/Avoid table first,
+      then in-character flavor; 3-month headline archive under `personas/the_herald/headlines/`
+- [x] `personas/the_empath/persona.md` — meta voice over the `persona_calls` ledger (dormant)
+- [ ] `personas/the_insider/persona.md` — **not yet written** (data layer live; voice pending)
 - [ ] Rename the characters if the placeholders don't fit the brand
 - [x] Add an explicit "when cold, tell them to ignore me" clause to each bible
 
@@ -112,11 +155,12 @@ Start with **insider Form 4** — highest signal, lowest noise.
 
 ## Phase 9 — Deploy
 
-- [ ] `railway.toml` + `Procfile`
-- [ ] Cron: ingest (daily, after market close)
-- [ ] Cron: sim + streak (chained after ingest)
+- [x] `railway.toml` (`ingest.daily`, `restartPolicyType = NEVER`; cron schedule kept in the
+      service config, not the toml, so one-off manual runs aren't overridden on deploy)
+- [x] Cron: ingest (daily, ~06:00 UTC — news + insider via `ingest.daily`)
+- [ ] Cron: sim + streak (chained after ingest) — blocked on the simulator (needs `price_history`)
 - [ ] Cron: reports (1st of month, 1st of quarter)
-- [ ] Env vars set in Railway dashboard
+- [x] Env vars set in Railway dashboard (`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `FINNHUB_API_KEY`)
 - [ ] Failure alerting (Discord webhook — same pattern as the bot crew)
 - [ ] **Checkpoint:** a full unattended cycle completes with no browser open
 
@@ -155,7 +199,14 @@ Start with **insider Form 4** — highest signal, lowest noise.
 
 ## Never
 
-- ❌ No trade execution in the pipeline. Watchlists are the only Robinhood write.
+- ⚠️ **Execution is human-approved, never autonomous.** The **headless pipeline** (Railway)
+  never places trades and holds no brokerage credentials. In the **interactive layer** (user
+  present), the agent may place a **long equity** order **only after explicit per-trade
+  confirmation**, and **only in the ring-fenced `agentic_allowed` account**. Flow: propose →
+  `review_equity_order` preview → user confirms → `place_equity_order` → report fill + log.
+  **Options execution, exercises, and any unattended/autonomous order remain forbidden.**
+  Watchlist writes are always allowed. (Validated 2026-07-28 — a $2 SPY buy + a $1 CRWV sell,
+  each per-trade-confirmed.)
 - ❌ No brokerage credentials in Railway. Price data comes from Finnhub.
 - ❌ No secrets committed. `.env` stays gitignored.
 - ❌ Voice never drives state. Data → state → voice, one direction.

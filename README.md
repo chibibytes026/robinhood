@@ -30,6 +30,7 @@ It exists to make a human a sharper decision-maker. **It does not trade.**
 | `the_architect` | 🧠 The Architect | *Long the future, short the hype.* | Thesis barbell — long AI infra/power, short the hype | backtested P&L | 🟡 In progress |
 | `the_herald` | 📯 The Herald | *The signs are written; I only read them aloud.* | News/trend reader across seven watches — the **background voice** | sign clarity, not P&L | 🟢 Active |
 | `the_empath` | 🫀 The Empath | *I speak for the ones you stopped hearing.* | Reader of the `persona_calls` ledger — amplifies the ignored-but-right; **meta voice** | neglect-signal clarity, not P&L | ⚪ Dormant |
+| `the_insider` | 🕵️ The Insider | *The ones who know, buy.* | Follows corporate insiders' open-market Form-4 buys (`P`) — cluster/rank/into-weakness; contrarian, low-frequency | backtested P&L (pending sim) | 🟡 In progress — data live |
 
 **Status** (persona lifecycle): 🟢 **Active** = live and feeding calls · 🟡 **In progress** = registered, being built, not yet live · ⚪ **Dormant** = registered but gated / not yet operational. Today only The Herald is live.
 
@@ -53,7 +54,19 @@ ranking structure and speaking only in its `hush` register — until **≥10 per
 (today: 1) and their calls are actually scored. Its registers are `resonance` / `murmur` /
 `hush`. See [`personas/the_empath/persona.md`](./personas/the_empath/persona.md).
 
-All five are fictional characters. Not the real individuals, not their opinions, not
+**The Insider follows the money inside the building.** It tracks corporate insiders' *open-market
+purchases* (SEC Form 4 code `P`) — the one high-conviction tell — weighting clusters over lone
+buys, CEO/CFO over VP, and buying into weakness; it ignores the `S`/`A`/`M` noise. Its nightly
+Finnhub feed is **live** (`insider_trades` → the `insider_buys` P-only report and
+`insider_coverage_gaps`). The relevance test taught the lesson: **the signal is rare** — of
+~5,100 recent transactions across the watchlist, only **6 were open-market buys**, clustered in
+**AVGO** and **MSFT**, while every AI-infra name (NVDA, CRWV, VST, CEG, BE…) showed *zero* insider
+buying. So it's a **low-frequency, contrarian** voice by design — quiet unless real inside money
+moves, and currently whispering "AVGO" while the crowd shouts "NVDA." It has data but no
+backtested record yet, so it's signal-stage (`active=false`) until the simulator exists. No voice
+bible written yet.
+
+All six are fictional characters. Not the real individuals, not their opinions, not
 financial advice.
 
 ## Data sources
@@ -63,7 +76,7 @@ Where each persona/signal's data comes from, and what's wired vs. pending. Free-
 | Persona / signal | Data need | Source | Status |
 |---|---|---|---|
 | 📯 The Herald | market + company news | Finnhub (free) | ✅ live — nightly cron → `market_news` |
-| ⭐ Insider signal *(new)* | Form 4 insider buys | Finnhub insider transactions (free) | ⏳ next up |
+| 🕵️ The Insider | Form 4 insider buys | Finnhub insider transactions (free) | ✅ live — nightly cron → `insider_trades` / `insider_buys` |
 | 🧠 The Architect | 13F institutional holdings | SEC EDGAR (free) | ⬜ planned |
 | 🎯 The Oracle · 🏛️ The House | congressional trades | Finnhub congressional = **premium**; no clean free API found (S3 mirrors dead, clerk site IP-blocked) | ⛔ blocked — decision needed |
 | 🫀 The Empath | its own scorecard (ignored-but-right) | internal — the `persona_calls` ledger | ⚪ dormant — gated: needs ≥10 live personas |
