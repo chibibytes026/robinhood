@@ -1,0 +1,305 @@
+-- ============================================================
+-- Robinhood Persona Trading System — Supabase schema
+-- Run top-to-bottom in the Supabase SQL editor.
+--
+-- This file is the canonical schema and matches the live
+-- `robinhood-personas` Supabase project. Notable points vs. the
+-- first draft:
+--   * persona_performance.window_label — 'window' is a RESERVED
+--     keyword in Postgres and cannot be an unquoted column name.
+--   * securities is seeded with the watchlist tickers + SPY/VOO so
+--     the FK-bearing ingestion tables have parents to reference.
+--   * RLS is enabled on every table with no policies: the anon and
+--     authenticated roles are denied, while the server-side
+--     service-role key (pipeline + MCP) bypasses RLS.
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- LAYER 1: REFERENCE
+-- ------------------------------------------------------------
+
+create table if not exists securities (
+  ticker      text primary key,
+  name        text,
+  sector      text,
+  asset_type  text default 'equity',   -- equity | etf
+  created_at  timestamptz default now()
+);
+
+-- Daily OHLCV. This is what the simulator reads. Source: Finnhub / EDGAR-adjacent
+-- free feeds. Do NOT depend on Robinhood here — keep the cron pipeline headless.
+create table if not exists price_history (
+  ticker      text references securities(ticker),
+  date        date not null,
+  open        numeric,
+  high        numeric,
+  low         numeric,
+  close       numeric,
+  volume      bigint,
+  source      text,
+  primary key (ticker, date)
+);
+
+create index if not exists idx_price_history_date on price_history(date);
+
+
+-- ------------------------------------------------------------
+-- LAYER 2: RAW DISCLOSURE DATA (ingested, never hand-edited)
+-- ------------------------------------------------------------
+
+-- SEC Form 4. txn_code 'P' = open-market purchase (the only real conviction tell).
+create table if not exists insider_trades (
+  id            bigint generated always as identity primary key,
+  ticker        text references securities(ticker),
+  insider_name  text,
+  title         text,                  -- CEO, CFO, Director, 10% Owner
+  txn_code      char(1),               -- P buy | S sell | A grant | M option exercise
+  shares        numeric,
+  price         numeric,
+  value_usd     numeric,
+  trade_date    date,
+  filed_date    date,
+  source        text default 'sec_edgar',
+  ingested_at   timestamptz default now(),
+  unique (ticker, insider_name, trade_date, txn_code, shares)
+);
+
+create index if not exists idx_insider_ticker_date on insider_trades(ticker, trade_date desc);
+create index if not exists idx_insider_code on insider_trades(txn_code);
+
+-- House/Senate clerk STOCK Act filings. Amounts are RANGES, not exact.
+create table if not exists congress_trades (
+  id              bigint generated always as identity primary key,
+  ticker          text references securities(ticker),
+  politician      text,
+  chamber         text,                -- house | senate
+  txn_type        text,                -- purchase | sale | exchange
+  asset_type      text,                -- stock | call | put
+  amount_range    text,                -- e.g. '$1,001 - $15,000'
+  amount_low      numeric,             -- parsed floor of range
+  amount_high     numeric,             -- parsed ceiling of range
+  trade_date      date,
+  disclosed_date  date,                -- often WEEKS after trade_date
+  source          text default 'house_clerk',
+  ingested_at     timestamptz default now(),
+  unique (ticker, politician, trade_date, txn_type, amount_range)
+);
+
+create index if not exists idx_congress_ticker_date on congress_trades(ticker, trade_date desc);
+
+-- 13F quarterly holdings. put_call null = long stock; snapshot only, 45-day lag.
+create table if not exists institutional_holdings (
+  id             bigint generated always as identity primary key,
+  ticker         text references securities(ticker),
+  fund_name      text,
+  cik            text,
+  value_usd      numeric,
+  shares         numeric,
+  pct_portfolio  numeric,
+  put_call       text,                 -- null | PUT | CALL
+  report_period  date,                 -- quarter end
+  filed_date     date,
+  source         text default 'sec_edgar',
+  ingested_at    timestamptz default now(),
+  unique (cik, ticker, report_period, put_call)
+);
+
+create index if not exists idx_inst_fund_period on institutional_holdings(fund_name, report_period desc);
+
+
+-- ------------------------------------------------------------
+-- LAYER 3: PERSONAS
+-- ------------------------------------------------------------
+
+-- One row per character. Voice bible lives in the repo (personas/<slug>/persona.md);
+-- this table holds the queryable metadata + which raw data feeds it.
+create table if not exists personas (
+  slug           text primary key,     -- the_oracle | the_house | the_architect
+  display_name   text,
+  tagline        text,
+  style_summary  text,
+  source_type    text,                 -- congress | insider | institutional
+  source_key     text,                 -- matches politician / fund_name / insider_name
+  active         boolean default true,
+  created_at     timestamptz default now()
+);
+
+-- Normalized trade feed per persona. Populated from the raw tables by a mapper,
+-- so the sim reads ONE consistent shape regardless of source.
+create table if not exists persona_trades (
+  id             bigint generated always as identity primary key,
+  persona        text references personas(slug),
+  ticker         text references securities(ticker),
+  side           text,                 -- buy | sell
+  trade_date     date,
+  disclosed_date date,
+  amount_usd     numeric,              -- midpoint if source only gives a range
+  amount_is_est  boolean default false,
+  source_table   text,                 -- insider_trades | congress_trades | institutional_holdings
+  source_id      bigint,
+  created_at     timestamptz default now(),
+  unique (persona, ticker, trade_date, side, source_table, source_id)
+);
+
+create index if not exists idx_ptrades_persona_date on persona_trades(persona, trade_date desc);
+
+
+-- ------------------------------------------------------------
+-- LAYER 4: SIMULATION
+-- ------------------------------------------------------------
+
+-- One row per backtested trade. Fractional shares carried to 6 decimals —
+-- no whole-share rounding, matching how Robinhood actually fills dollar orders.
+create table if not exists backtests (
+  id             bigint generated always as identity primary key,
+  persona        text references personas(slug),
+  ticker         text references securities(ticker),
+  entry_date     date,
+  exit_date      date,
+  hold_days      int,
+  price_basis    text,                 -- close_to_close | next_open
+  amount_usd     numeric,
+  entry_price    numeric,
+  shares         numeric(20,6),        -- fractional, 6dp
+  exit_price     numeric,
+  exit_value     numeric,
+  net_usd        numeric,
+  net_pct        numeric,
+  spy_return_pct numeric,              -- benchmark over same window
+  alpha_pct      numeric,              -- net_pct - spy_return_pct
+  is_win         boolean,
+  run_id         uuid,
+  created_at     timestamptz default now()
+);
+
+create index if not exists idx_backtests_persona on backtests(persona, entry_date desc);
+
+-- Rolling streak state. Recomputed after every sim run.
+-- state drives the persona's VOICE. Data -> state -> voice. Never the reverse.
+-- NOTE: window_label, not `window` — 'window' is a reserved keyword in Postgres.
+create table if not exists persona_performance (
+  id            bigint generated always as identity primary key,
+  persona       text references personas(slug),
+  window_label  text,                  -- 30d | 90d | ytd | all
+  trades_closed int,
+  hit_rate      numeric,               -- 0..1
+  net_return    numeric,               -- % over window
+  alpha_vs_spy  numeric,
+  streak_run    int,                   -- + = consecutive wins, - = consecutive losses
+  trend         text,                  -- improving | decaying | flat
+  state         text,                  -- winning | losing | stagnant
+  computed_at   timestamptz default now(),
+  unique (persona, window_label, computed_at)
+);
+
+create index if not exists idx_perf_persona on persona_performance(persona, computed_at desc);
+
+
+-- ------------------------------------------------------------
+-- LAYER 5: NARRATIVE OUTPUT
+-- ------------------------------------------------------------
+
+-- In-voice monthly/quarterly writeups, generated from backtests + persona_performance.
+-- This is what Claude retrieves at query time.
+create table if not exists persona_reports (
+  id             bigint generated always as identity primary key,
+  persona        text references personas(slug),
+  period_type    text,                 -- monthly | quarterly
+  period_label   text,                 -- 2026-07 | 2026-Q3
+  period_start   date,
+  period_end     date,
+  state_at_close text,                 -- streak state when written
+  body_md        text,                 -- the in-voice report
+  metrics        jsonb,                -- snapshot of the numbers it was built from
+  created_at     timestamptz default now(),
+  unique (persona, period_type, period_label)
+);
+
+-- Scored signals: raw filings become decisions here.
+-- Cluster > lone. 'P' code only. CEO/CFO weighted above VP.
+create table if not exists watchlist_signals (
+  id           bigint generated always as identity primary key,
+  ticker       text references securities(ticker),
+  signal_type  text,                   -- insider_cluster | congress_buy | fund_new_position
+  score        numeric,                -- 0..100
+  rationale    text,
+  persona      text references personas(slug),
+  created_at   timestamptz default now()
+);
+
+create index if not exists idx_signals_score on watchlist_signals(score desc, created_at desc);
+
+
+-- ------------------------------------------------------------
+-- LAYER 6: OPS
+-- ------------------------------------------------------------
+
+create table if not exists ingest_runs (
+  id            bigint generated always as identity primary key,
+  source        text,
+  rows_ingested int,
+  status        text,                  -- ok | partial | failed
+  error_msg     text,
+  duration_ms   int,
+  ran_at        timestamptz default now()
+);
+
+
+-- ------------------------------------------------------------
+-- SEED: securities (watchlist tickers + benchmark)
+-- Seeded so the FK-bearing raw/price tables have parents to reference.
+-- ------------------------------------------------------------
+
+insert into securities (ticker, name, sector, asset_type) values
+  ('NVDA',  'NVIDIA Corp',            'Technology',    'equity'),
+  ('VST',   'Vistra Corp',            'Utilities',     'equity'),
+  ('BE',    'Bloom Energy Corp',      'Industrials',   'equity'),
+  ('CRWV',  'CoreWeave Inc',          'Technology',    'equity'),
+  ('CEG',   'Constellation Energy',   'Utilities',     'equity'),
+  ('AAPL',  'Apple Inc',              'Technology',    'equity'),
+  ('MSFT',  'Microsoft Corp',         'Technology',    'equity'),
+  ('GOOGL', 'Alphabet Inc',           'Communication', 'equity'),
+  ('AMZN',  'Amazon.com Inc',         'Consumer',      'equity'),
+  ('META',  'Meta Platforms Inc',     'Communication', 'equity'),
+  ('AVGO',  'Broadcom Inc',           'Technology',    'equity'),
+  ('VOO',   'Vanguard S&P 500 ETF',   'Index',         'etf'),
+  ('SPY',   'SPDR S&P 500 ETF Trust', 'Index',         'etf')
+on conflict (ticker) do nothing;
+
+
+-- ------------------------------------------------------------
+-- SEED: the three personas
+-- ------------------------------------------------------------
+
+insert into personas (slug, display_name, tagline, style_summary, source_type, source_key) values
+  ('the_house',     'The House',     'The house always wins.',
+   'Broad index-like ownership, bond ballast, high turnover but effectively passive. Rides the market, never sweats a single name.',
+   'congress', 'Donald Trump'),
+  ('the_oracle',    'The Oracle',    'Patience, then the strike.',
+   'Rare, concentrated mega-cap tech bets. Long-dated LEAPS leverage. Trades infrequently with uncanny timing.',
+   'congress', 'Nancy Pelosi'),
+  ('the_architect', 'The Architect', 'Long the future, short the hype.',
+   'Thesis barbell: long AI infrastructure and power, hedged with puts against overheated chip names. Multi-year conviction.',
+   'institutional', 'Situational Awareness LP')
+on conflict (slug) do nothing;
+
+
+-- ------------------------------------------------------------
+-- SECURITY: enable RLS on every table (no policies).
+-- The anon/authenticated roles are denied entirely; the server-side
+-- service-role key bypasses RLS, so the pipeline and MCP keep full access.
+-- Add per-table policies here if a public/authenticated client is ever introduced.
+-- ------------------------------------------------------------
+
+alter table public.securities             enable row level security;
+alter table public.price_history          enable row level security;
+alter table public.insider_trades         enable row level security;
+alter table public.congress_trades        enable row level security;
+alter table public.institutional_holdings enable row level security;
+alter table public.personas               enable row level security;
+alter table public.persona_trades         enable row level security;
+alter table public.backtests              enable row level security;
+alter table public.persona_performance    enable row level security;
+alter table public.persona_reports        enable row level security;
+alter table public.watchlist_signals      enable row level security;
+alter table public.ingest_runs            enable row level security;

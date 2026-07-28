@@ -1,0 +1,24 @@
+# Data pipeline
+requests>=2.32
+httpx>=0.27
+pandas>=2.2
+python-dateutil>=2.9
+
+# SEC EDGAR
+edgartools>=3.0
+
+# Market data
+finnhub-python>=2.4
+
+# Database
+supabase>=2.15
+psycopg2-binary>=2.9
+
+# Report generation
+anthropic>=0.40
+
+# Scheduling
+APScheduler>=3.10
+
+# Config
+python-dotenv>=1.0
