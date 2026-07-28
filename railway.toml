@@ -1,19 +1,19 @@
-# Railway config for the nightly news-ingestion cron.
+# Railway config for the nightly Finnhub-ingestion cron.
 #
-# One cron service runs one command. This service pulls news into Supabase
-# `market_news` every night so the bots have fresh headlines to call upon in the
-# morning. The sim+streak and reports crons are SEPARATE Railway services pointing
-# at this same repo, each with its own startCommand + cronSchedule.
+# One cron service runs one command: `ingest.daily`, which pulls BOTH news and
+# insider transactions into Supabase every night so the bots have fresh data to
+# call upon in the morning. The sim+streak and reports crons are SEPARATE Railway
+# services pointing at this same repo, each with its own startCommand + cronSchedule.
 #
 # Required env vars (set in the Railway service, never committed):
 #   SUPABASE_URL, SUPABASE_SERVICE_KEY, FINNHUB_API_KEY
-# Optional: NEWS_TIMESPAN (default 24H), NEWS_LOOKBACK_DAYS (default 1)
+# Optional: NEWS_LOOKBACK_DAYS (default 1), NEWS_RETENTION_DAYS (default 90)
 
 [build]
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "python -m ingest.news"
+startCommand = "python -m ingest.daily"
 # Cron schedule is managed in the Railway service config (set via API / dashboard):
 #   0 6 * * *   — 06:00 UTC nightly (~1-2am ET), after the US close + overnight news.
 # Deliberately NOT set here: a config-file cron overrides dashboard changes on every
