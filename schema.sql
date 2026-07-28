@@ -194,6 +194,35 @@ create table if not exists persona_performance (
 
 create index if not exists idx_perf_persona on persona_performance(persona, computed_at desc);
 
+-- Persona reactions ledger: every call a persona makes, what the user did about it,
+-- whether that was agreement or defiance, and (graded later) who was right. This is the
+-- persona-vs-user scorecard — inspired by companion-reputation systems.
+create table if not exists persona_calls (
+  id              bigint generated always as identity primary key,
+  persona         text references personas(slug),
+  ticker          text references securities(ticker),
+  call_date       date not null,
+  verdict         text not null,        -- buy | speculative | watch | hold | avoid | trim | sell
+  register        text,                 -- persona conviction at call time (clarion|murk|silence, or streak state)
+  rationale       text,                 -- the sign / reason given
+  call_price      numeric,              -- price at the moment of the call (scoring baseline)
+  user_action     text,                 -- bought | sold | trimmed | held | none
+  agreement       text,                 -- agree | disagree | n/a
+  reaction        text,                 -- flavor tag, e.g. 'The Herald will remember this.'
+  linked_order    text,                 -- brokerage order id if the user acted
+  scored_date     date,                 -- null until graded
+  score_price     numeric,
+  return_pct      numeric,              -- call_price -> score_price
+  spy_return_pct  numeric,              -- benchmark over same window
+  alpha_pct       numeric,
+  verdict_correct boolean,              -- did the call prove right, given its intent?
+  created_at      timestamptz default now(),
+  unique (persona, ticker, call_date, verdict)
+);
+
+create index if not exists idx_persona_calls_persona on persona_calls(persona, call_date desc);
+create index if not exists idx_persona_calls_open on persona_calls(scored_date) where scored_date is null;
+
 
 -- ------------------------------------------------------------
 -- LAYER 5: NARRATIVE OUTPUT
@@ -300,6 +329,7 @@ alter table public.personas               enable row level security;
 alter table public.persona_trades         enable row level security;
 alter table public.backtests              enable row level security;
 alter table public.persona_performance    enable row level security;
+alter table public.persona_calls          enable row level security;
 alter table public.persona_reports        enable row level security;
 alter table public.watchlist_signals      enable row level security;
 alter table public.ingest_runs            enable row level security;
