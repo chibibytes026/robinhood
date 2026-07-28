@@ -73,6 +73,10 @@ Also free on Finnhub and worth pulling as *context* (not persona state): insider
 **congressional gap** (Oracle/House) is the one unresolved source — pay Finnhub premium
 (~$12/mo), find another free feed, or keep the manual bootstrap.
 
+> **Retention:** `market_news` keeps a rolling **3-month window** — the nightly cron deletes
+> anything older (`NEWS_RETENTION_DAYS`, default 90). **We never backfill news more than 3
+> months back**, and any backfilled rows past the window are trimmed on the next run.
+
 > ⭐ **The major next step for the backtested personas: price history from Finnhub.**
 > The winners/losers simulation — the thing that turns The House / Oracle / Architect from
 > voices-without-a-record into real, stateful personas — needs historical daily OHLC
