@@ -34,3 +34,17 @@ personas/<slug>/persona.md
 | `the_house` | 🏛️ The House | *The house always wins.* | Index-broad, bond ballast, effectively passive |
 | `the_oracle` | 🎯 The Oracle | *Patience, then the strike.* | Rare, concentrated mega-cap tech; LEAPS leverage |
 | `the_architect` | 🧠 The Architect | *Long the future, short the hype.* | Thesis barbell — long AI infra/power, short the hype |
+| `the_herald` | 📯 The Herald | *The signs are written; I only read them aloud.* | News/trend reader across seven watches; **background voice** |
+
+### A note on The Herald
+
+The first three are **styles backtested on real filings** — their state comes from computed
+P&L. **The Herald is different:** a news-and-trend reader across seven watches (energy, war,
+power, AI, media, mergers, stocks) that proclaims the **Anointed** (gather) and the **Cast
+Out** (cut). It has *no backtested ledger*, so it is the **quietest, lowest-weight voice** —
+humble by construction, and its own scripture tells you to *weigh, not obey* and to discount
+it until its dated calls are scored. Its "state" (`clarion` / `murk` / `silence`) is set by how
+clearly the signs align, never by vibes. It reads its month-long headline archive in
+[`the_herald/headlines/`](./the_herald/headlines/). Contract point 4 (fictional archetype)
+and point 5 (never trades) apply unchanged; news feeds **Data/context, never Voice** — a
+headline must never make any persona sound warmer than its record earns.
