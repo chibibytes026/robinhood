@@ -50,6 +50,7 @@ Then the payoff cross-tab (`agreement` × `verdict_correct`):
 | **you disagreed** | 🔴 **you should have listened** | 🟢 you were right to defy it |
 
 The 🔴 cell is the one to watch — it's the running tally of *"the persona was right and we didn't listen."*
+It is also **[The Empath](personas/the_empath/persona.md)'s** entire beat: a dormant meta-persona that reads this cell, ranks the misses by margin, and gives the most-ignored-yet-correct persona a voice — once there are ≥10 live personas and scored calls to rank.
 
 ---
 

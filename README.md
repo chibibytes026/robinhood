@@ -23,12 +23,15 @@ It exists to make a human a sharper decision-maker. **It does not trade.**
 
 ## The personas
 
-| Slug | | Tagline | Style | State from |
-|---|---|---|---|---|
-| `the_house` | 🏛️ The House | *The house always wins.* | Index-broad, bond ballast, effectively passive | backtested P&L |
-| `the_oracle` | 🎯 The Oracle | *Patience, then the strike.* | Rare, concentrated mega-cap tech; LEAPS leverage | backtested P&L |
-| `the_architect` | 🧠 The Architect | *Long the future, short the hype.* | Thesis barbell — long AI infra/power, short the hype | backtested P&L |
-| `the_herald` | 📯 The Herald | *The signs are written; I only read them aloud.* | News/trend reader across seven watches — the **background voice** | sign clarity, not P&L |
+| Slug | | Tagline | Style | State from | Status |
+|---|---|---|---|---|---|
+| `the_house` | 🏛️ The House | *The house always wins.* | Index-broad, bond ballast, effectively passive | backtested P&L | 🟡 In progress |
+| `the_oracle` | 🎯 The Oracle | *Patience, then the strike.* | Rare, concentrated mega-cap tech; LEAPS leverage | backtested P&L | 🟡 In progress |
+| `the_architect` | 🧠 The Architect | *Long the future, short the hype.* | Thesis barbell — long AI infra/power, short the hype | backtested P&L | 🟡 In progress |
+| `the_herald` | 📯 The Herald | *The signs are written; I only read them aloud.* | News/trend reader across seven watches — the **background voice** | sign clarity, not P&L | 🟢 Active |
+| `the_empath` | 🫀 The Empath | *I speak for the ones you stopped hearing.* | Reader of the `persona_calls` ledger — amplifies the ignored-but-right; **meta voice** | neglect-signal clarity, not P&L | ⚪ Dormant |
+
+**Status** (persona lifecycle): 🟢 **Active** = live and feeding calls · 🟡 **In progress** = registered, being built, not yet live · ⚪ **Dormant** = registered but gated / not yet operational. Today only The Herald is live.
 
 The first three are **archetypes of public trading styles** — fictional characters layered
 on public filing data, their register (`winning` / `losing` / `stagnant`) set by computed P&L.
@@ -41,7 +44,16 @@ state (`clarion` / `murk` / `silence`) reflects only how clearly the signs align
 scripture tells you to *weigh, not obey*. News feeds **data/context, never voice**: a headline
 never makes any persona sound warmer than its record earns.
 
-All four are fictional characters. Not the real individuals, not their opinions, not
+**The Empath is a fifth, meta voice — and deliberately silent for now.** It runs no strategy of
+its own: it reads the `persona_calls` ledger for the case where *you defied a persona and it
+turned out right* (`agreement = disagree` ∧ `verdict_correct = true`), ranks those misses by
+margin, and gives the most-ignored-yet-correct persona a hearing. Because "right by a wider
+margin *than the rest*" needs a real field to rank against, it stays **dormant** — building no
+ranking structure and speaking only in its `hush` register — until **≥10 personas are live**
+(today: 1) and their calls are actually scored. Its registers are `resonance` / `murmur` /
+`hush`. See [`personas/the_empath/persona.md`](./personas/the_empath/persona.md).
+
+All five are fictional characters. Not the real individuals, not their opinions, not
 financial advice.
 
 ## Data sources
@@ -54,6 +66,7 @@ Where each persona/signal's data comes from, and what's wired vs. pending. Free-
 | ⭐ Insider signal *(new)* | Form 4 insider buys | Finnhub insider transactions (free) | ⏳ next up |
 | 🧠 The Architect | 13F institutional holdings | SEC EDGAR (free) | ⬜ planned |
 | 🎯 The Oracle · 🏛️ The House | congressional trades | Finnhub congressional = **premium**; no clean free API found (S3 mirrors dead, clerk site IP-blocked) | ⛔ blocked — decision needed |
+| 🫀 The Empath | its own scorecard (ignored-but-right) | internal — the `persona_calls` ledger | ⚪ dormant — gated: needs ≥10 live personas |
 
 Also free on Finnhub and worth pulling as *context* (not persona state): insider sentiment
 (MSPR), recommendation trends, earnings calendar/surprises, basic financials. The

@@ -29,12 +29,15 @@ personas/<slug>/persona.md
 
 ## The characters
 
-| Slug | | Tagline | Style |
-|---|---|---|---|
-| `the_house` | 🏛️ The House | *The house always wins.* | Index-broad, bond ballast, effectively passive |
-| `the_oracle` | 🎯 The Oracle | *Patience, then the strike.* | Rare, concentrated mega-cap tech; LEAPS leverage |
-| `the_architect` | 🧠 The Architect | *Long the future, short the hype.* | Thesis barbell — long AI infra/power, short the hype |
-| `the_herald` | 📯 The Herald | *The signs are written; I only read them aloud.* | News/trend reader across seven watches; **background voice** |
+| Slug | | Tagline | Style | Status |
+|---|---|---|---|---|
+| `the_house` | 🏛️ The House | *The house always wins.* | Index-broad, bond ballast, effectively passive | 🟡 In progress |
+| `the_oracle` | 🎯 The Oracle | *Patience, then the strike.* | Rare, concentrated mega-cap tech; LEAPS leverage | 🟡 In progress |
+| `the_architect` | 🧠 The Architect | *Long the future, short the hype.* | Thesis barbell — long AI infra/power, short the hype | 🟡 In progress |
+| `the_herald` | 📯 The Herald | *The signs are written; I only read them aloud.* | News/trend reader across seven watches; **background voice** | 🟢 Active |
+| `the_empath` | 🫀 The Empath | *I speak for the ones you stopped hearing.* | Reader of the `persona_calls` ledger; amplifies the ignored-but-right; **meta voice** | ⚪ Dormant |
+
+**Status** (persona lifecycle): 🟢 **Active** = live and feeding calls · 🟡 **In progress** = being built, not yet live · ⚪ **Dormant** = registered but gated (see The Empath). Today only The Herald is live.
 
 ### A note on The Herald
 
@@ -48,3 +51,16 @@ clearly the signs align, never by vibes. It reads its month-long headline archiv
 [`the_herald/headlines/`](./the_herald/headlines/). Contract point 4 (fictional archetype)
 and point 5 (never trades) apply unchanged; news feeds **Data/context, never Voice** — a
 headline must never make any persona sound warmer than its record earns.
+
+### A note on The Empath
+
+Unlike the other four, The Empath reads no market and no filings — it reads **us**. Its source
+is the `persona_calls` ledger itself: it hunts the 🔴 *"you should have listened"* cell (you
+moved *against* a persona and the call later scored right — `agreement = disagree` ∧
+`verdict_correct = true`), ranks those misses by margin, and gives the most-ignored-yet-correct
+persona a voice. It owns no strategy and originates no calls — it **amplifies** a neglected one.
+By its own **Ten-Voice Rule** it stays silent (register `hush`) and builds no ranking structure
+until **≥10 personas are live** and their calls are scored — with fewer, "a wider margin than
+the rest" has no legs to stand on (today: 1 live, ledger unscored → dormant). Its registers are
+`resonance` / `murmur` / `hush`. Contract points 4 and 5 apply unchanged; it never overrides a
+backtested state and discounts itself always.
