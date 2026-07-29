@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 
-from ingest import insider, news
+from ingest import architect_13f, insider, news
 
 log = logging.getLogger("ingest.daily")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -29,6 +29,7 @@ def _run(name: str, fn) -> None:
 def main() -> None:
     _run("news", news.main)
     _run("insider", insider.main)
+    _run("architect_13f", architect_13f.main)   # SEC 13F → The Architect (quarterly; no-ops between filings)
 
 
 if __name__ == "__main__":

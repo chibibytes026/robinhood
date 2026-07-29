@@ -122,24 +122,102 @@ create table if not exists congress_trades (
 
 create index if not exists idx_congress_ticker_date on congress_trades(ticker, trade_date desc);
 
--- 13F quarterly holdings. put_call null = long stock; snapshot only, 45-day lag.
+-- 13F quarterly holdings, stored BY CUSIP + issuer (no CUSIP->ticker mapping — ticker
+-- is optional/null by design). put_call in (LONG|PUT|CALL); snapshot only, ~45-day lag.
 create table if not exists institutional_holdings (
   id             bigint generated always as identity primary key,
-  ticker         text references securities(ticker),
+  ticker         text references securities(ticker),   -- optional; left null (no CUSIP->ticker map)
+  cusip          text,
+  issuer         text,                 -- issuer name as reported on the 13F
   fund_name      text,
   cik            text,
   value_usd      numeric,
   shares         numeric,
   pct_portfolio  numeric,
-  put_call       text,                 -- null | PUT | CALL
+  put_call       text,                 -- LONG | PUT | CALL
   report_period  date,                 -- quarter end
   filed_date     date,
   source         text default 'sec_edgar',
   ingested_at    timestamptz default now(),
-  unique (cik, ticker, report_period, put_call)
+  unique (cik, cusip, report_period, put_call)
 );
 
 create index if not exists idx_inst_fund_period on institutional_holdings(fund_name, report_period desc);
+create index if not exists idx_inst_cik_period  on institutional_holdings(cik, report_period desc);
+
+comment on table institutional_holdings is
+ 'SEC 13F-HR quarterly holdings, stored BY CUSIP + issuer (no CUSIP->ticker mapping — ticker is '
+ 'optional/null by design). Long 13(f) securities only, ~45-day lag, quarterly. put_call in '
+ '(LONG|PUT|CALL) — the PUT rows are how The Architect''s "short the hype" hedges show up. Feeds '
+ 'The Architect''s reporting. Retention: the two most recent report_periods per fund are kept so '
+ 'quarter-over-quarter moves stay computable (view institutional_moves). Completeness: every 13F '
+ 'filing seen on EDGAR is recorded in institutional_filings; institutional_coverage_gaps is the '
+ 'bot''s "am I missing a report?" check.';
+
+-- Manifest of every 13F filing seen on EDGAR (the missing-report ledger). The ingester
+-- writes a row per filing (ingested=false), then flips ingested=true + holdings_count once
+-- holdings load. A missing report = an in-window row with ingested=false / holdings_count 0,
+-- or a gap in the report_period sequence. See view institutional_coverage_gaps.
+create table if not exists institutional_filings (
+  accession      text primary key,
+  cik            text,
+  fund_name      text,
+  form           text,                 -- 13F-HR | 13F-HR/A
+  report_period  date,
+  filed_date     date,
+  holdings_count int,                  -- rows parsed & ingested for this filing (null = not yet)
+  ingested       boolean default false,
+  first_seen_at  timestamptz default now(),
+  ingested_at    timestamptz
+);
+
+create index if not exists idx_inst_filings_cik_period on institutional_filings(cik, report_period desc);
+
+-- The Architect's "am I missing a report?" check: within the tracked window (2 most recent
+-- 13F periods), filings recorded from EDGAR not yet successfully ingested. Empty = complete.
+create or replace view institutional_coverage_gaps with (security_invoker = true) as
+with ranked as (
+  select *, dense_rank() over (partition by cik order by report_period desc) as rk
+  from institutional_filings
+)
+select accession, cik, fund_name, form, report_period, filed_date, holdings_count, ingested
+from ranked
+where rk <= 2 and (ingested is not true or coalesce(holdings_count, 0) = 0)
+order by report_period desc;
+
+-- The Architect's buy/sell history: quarter-over-quarter change per holding+instrument
+-- (LONG/PUT/CALL) across the two retained periods — NEW / EXITED / ADDED / TRIMMED / HELD.
+create or replace view institutional_moves with (security_invoker = true) as
+with periods as (
+  select cik, report_period,
+         dense_rank() over (partition by cik order by report_period desc) as rk
+  from (select distinct cik, report_period from institutional_holdings) p
+),
+cur as (select h.* from institutional_holdings h
+        join periods pr on h.cik = pr.cik and h.report_period = pr.report_period and pr.rk = 1),
+prv as (select h.* from institutional_holdings h
+        join periods pr on h.cik = pr.cik and h.report_period = pr.report_period and pr.rk = 2)
+select
+  coalesce(cur.cik, prv.cik)                              as cik,
+  coalesce(cur.fund_name, prv.fund_name)                 as fund_name,
+  coalesce(cur.cusip, prv.cusip)                          as cusip,
+  coalesce(cur.issuer, prv.issuer)                        as issuer,
+  coalesce(cur.put_call, prv.put_call)                    as put_call,
+  cur.report_period                                       as cur_period,
+  prv.report_period                                       as prv_period,
+  prv.shares                                              as prev_shares,
+  cur.shares                                              as curr_shares,
+  coalesce(cur.shares, 0)   - coalesce(prv.shares, 0)     as shares_delta,
+  coalesce(cur.value_usd,0) - coalesce(prv.value_usd,0)   as value_delta,
+  case
+    when prv.cusip is null then 'NEW'
+    when cur.cusip is null then 'EXITED'
+    when cur.shares > prv.shares then 'ADDED'
+    when cur.shares < prv.shares then 'TRIMMED'
+    else 'HELD'
+  end                                                     as move
+from cur full outer join prv
+  on cur.cik = prv.cik and cur.cusip = prv.cusip and cur.put_call = prv.put_call;
 
 
 -- ------------------------------------------------------------
@@ -395,6 +473,7 @@ alter table public.price_history          enable row level security;
 alter table public.insider_trades         enable row level security;
 alter table public.congress_trades        enable row level security;
 alter table public.institutional_holdings enable row level security;
+alter table public.institutional_filings  enable row level security;
 alter table public.personas               enable row level security;
 alter table public.persona_trades         enable row level security;
 alter table public.backtests              enable row level security;
