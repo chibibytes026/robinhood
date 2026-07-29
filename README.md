@@ -25,14 +25,14 @@ It exists to make a human a sharper decision-maker. **It does not trade.**
 
 | Slug | | Tagline | Style | State from | Status |
 |---|---|---|---|---|---|
-| `the_house` | 🏛️ The House | *The house always wins.* | Index-broad, bond ballast, effectively passive | backtested P&L | 🟡 In progress |
-| `the_oracle` | 🎯 The Oracle | *Patience, then the strike.* | Rare, concentrated mega-cap tech; LEAPS leverage | backtested P&L | 🟡 In progress |
+| `the_house` | 🏛️ The House | *The house always wins.* | Index-broad, bond ballast, effectively passive | backtested P&L | ⚪ Dormant — congressional feed is premium |
+| `the_oracle` | 🎯 The Oracle | *Patience, then the strike.* | Rare, concentrated mega-cap tech; LEAPS leverage | backtested P&L | ⚪ Dormant — congressional feed is premium |
 | `the_architect` | 🧠 The Architect | *Long the future, short the hype.* | Thesis barbell — long AI infra/power, short the hype | backtested P&L | 🔵 Ready — 13F feed live; fires when price history lands |
 | `the_herald` | 📯 The Herald | *The signs are written; I only read them aloud.* | News/trend reader across seven watches — the **background voice** | sign clarity, not P&L | 🟢 Active |
 | `the_empath` | 🫀 The Empath | *I speak for the ones you stopped hearing.* | Reader of the `persona_calls` ledger — amplifies the ignored-but-right; **meta voice** | neglect-signal clarity, not P&L | ⚪ Dormant |
 | `the_insider` | 🕵️ The Insider | *The ones who know, buy.* | Follows corporate insiders' open-market Form-4 buys (`P`) — cluster/rank/into-weakness; contrarian, low-frequency | backtested P&L (pending sim) | 🔵 Ready — voice + data live; fires when price history lands |
 
-**Status** (persona lifecycle): 🟢 **Active** = live and feeding calls · 🔵 **Ready** = voice + data feed built, but gated on a missing dependency — fires the moment it lands · 🟡 **In progress** = registered, being built, not yet live · ⚪ **Dormant** = registered but gated / not yet operational. Today only The Herald is live; The Insider and The Architect are Ready, waiting on price history.
+**Status** (persona lifecycle): 🟢 **Active** = live and feeding calls · 🔵 **Ready** = voice + data feed built, but gated on a missing dependency — fires the moment it lands · 🟡 **In progress** = registered, being built, not yet live · ⚪ **Dormant** = registered but gated / not yet operational (an unmet dependency or a paywalled feed). Today only The Herald is live; The Insider and The Architect are Ready, waiting on price history; The House and The Oracle are Dormant until their congressional feed is paid for or replaced.
 
 The first three are **archetypes of public trading styles** — fictional characters layered
 on public filing data, their register (`winning` / `losing` / `stagnant`) set by computed P&L.
