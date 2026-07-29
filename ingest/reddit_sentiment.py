@@ -100,7 +100,10 @@ def _composio_execute(tool_slug: str, arguments: dict) -> dict:
         json=payload,
         timeout=HTTP_TIMEOUT,
     )
-    r.raise_for_status()
+    if not r.ok:
+        # Surface Composio's error body verbatim — it names the offending field, which is
+        # the fastest way to pin the exact v3 request shape from the Railway logs.
+        raise RuntimeError(f"composio {r.status_code} {tool_slug}: {r.text[:600]}")
     return r.json()
 
 
