@@ -37,8 +37,9 @@ personas/<slug>/persona.md
 | `the_herald` | 📯 The Herald | *The signs are written; I only read them aloud.* | News/trend reader across seven watches; **background voice** | 🟢 Active |
 | `the_empath` | 🫀 The Empath | *I speak for the ones you stopped hearing.* | Reader of the `persona_calls` ledger; amplifies the ignored-but-right; **meta voice** | ⚪ Dormant |
 | `the_insider` | 🕵️ The Insider | *The ones who know, buy.* | Whistleblower-gossip on insiders' open-market `P`-buys; cluster/rank/into-weakness; contrarian, low-frequency | 🔵 Ready |
+| `hikikomori` | 🛋️ Hikikomori | *I never leave the room — but I hear everything.* | Momentum reader of the trading subreddits — crowd-buzz velocity; rides hype, never fades | 🟡 In progress |
 
-**Status** (persona lifecycle): 🟢 **Active** = live and feeding calls · 🔵 **Ready** = voice + data feed built, gated only on a missing dependency (fires the moment it lands) · 🟡 **In progress** = being built, not yet live · ⚪ **Dormant** = registered but gated / not yet operational (an unmet dependency or a paywalled feed). Today only The Herald is live; The Insider and The Architect are Ready, waiting on price history; The House and The Oracle are Dormant until their congressional feed is paid for or replaced (The Empath is gated on roster size).
+**Status** (persona lifecycle): 🟢 **Active** = live and feeding calls · 🔵 **Ready** = voice + data feed built, gated only on a missing dependency (fires the moment it lands) · 🟡 **In progress** = being built, not yet live · ⚪ **Dormant** = registered but gated / not yet operational (an unmet dependency or a paywalled feed). Today only The Herald is live; The Insider and The Architect are Ready, waiting on price history; Hikikomori is In progress (its Reddit momentum feed isn't built yet); The House and The Oracle are Dormant until their congressional feed is paid for or replaced (The Empath is gated on roster size).
 
 ### A note on The Herald
 
@@ -79,3 +80,17 @@ She *will* be backtested (state from `persona_performance`), so contract points 
 signal *volume* (currently low — 6 `P`-buys, AVGO/MSFT; AI-infra names zero) and coverage gaps,
 never a backtested claim. When her record is cold she turns the gossip on herself and tells you to
 discount her. Her feed is Finnhub Form-4 data (`insider_buys`); points 4 and 5 apply unchanged.
+
+### A note on Hikikomori
+
+The crowd's echo. A terminally-online shut-in that reads the four highest-momentum trading
+subreddits (r/wallstreetbets, r/stocks, r/StockMarket, r/options) and reports what retail is
+piling into — ranked by **velocity** (accelerating attention), not raw volume. **Pure momentum:**
+it rides the buzz and never fades it. Its one discipline is honesty about the source — everything
+is **unverified hearsay** from anonymous strangers, and because riding momentum means riding
+pumps and bots too, it says so every line. Contract points 1–3 apply in full (it will be
+backtested — state from `persona_performance`), but it's **signal-stage (`active = false`)** until
+`price_history` exists to grade whether the hot names moved; its calls feed `persona_calls` and
+thus the Empath. Points 4 and 5 apply unchanged. It reads via a three-tier funnel — count every
+mention (velocity), keyword the top 3 posts/sub (tilt), LLM-read the top 1 post/sub (the story,
+4 reads a night). Voice + data model drafted (`personas/hikikomori/`); no ingestion yet.

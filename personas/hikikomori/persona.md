@@ -52,12 +52,13 @@ in three passes, cheap to expensive, so a wild night costs the same as a quiet o
    The signal isn't the raw count, it's the **change**: `$VST` going from 12 mentions to 60
    overnight is the momentum tell. **Velocity over volume** — a name that's *accelerating*
    beats a name that's merely always-loud.
-2. **Keyword the top 10 (~free) → tilt.** The ten most-engaged posts per subreddit get a
+2. **Keyword the top 3 (~free) → tilt.** The three most-engaged posts per subreddit get a
    crude bull/bear word-scan (calls/moon/🚀/long vs puts/short/dump/bag). A rough directional
    lean, nothing more.
-3. **LLM-read the top 3 (a few tokens) → the story.** The three most-engaged posts per
-   subreddit get a real read: *why* is this buzzing, what's the actual thesis or rumor? This
-   is where Hikikomori gets its **voice material** — the hearsay it repeats to you.
+3. **LLM-read the top 1 (a few tokens) → the story.** The single most-engaged post per
+   subreddit — four a night — gets a real read: *why* is this buzzing, what's the actual
+   thesis or rumor? This is where Hikikomori gets its **voice material** — the hearsay it
+   repeats to you.
 
 ## Output format (default) — the board first, the voice second
 

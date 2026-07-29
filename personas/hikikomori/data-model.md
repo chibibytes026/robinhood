@@ -38,11 +38,12 @@ that killed GDELT and 403s Finnhub from the agent session). Composio-as-proxy si
 | Tier | Scope (per subreddit) | Cost | Column(s) it fills |
 |---|---|---|---|
 | 1 — count | *every* matched post/comment | free | `reddit_buzz.mentions` → velocity |
-| 2 — keyword | top **10** by engagement | ~free | `reddit_buzz.bull_kw` / `bear_kw` → tilt |
-| 3 — LLM | top **3** by engagement | ~12 calls/night | `reddit_threads.summary` (the "story") |
+| 2 — keyword | top **3** by engagement | ~free | `reddit_buzz.bull_kw` / `bear_kw` → tilt |
+| 3 — LLM | top **1** by engagement | ~4 calls/night | `reddit_threads.summary` (the "story") |
 
-Engagement rank = `score + num_comments`. The top-3/top-10 cut is **per subreddit** (so WSB
-doesn't take every slot); everything else is still *counted* for velocity — counting is free,
+Engagement rank = `score + num_comments`. Both cuts are **per subreddit** (so WSB doesn't take
+every slot): the single loudest post per sub gets the LLM read (4 posts/night total), the top
+three get the keyword scan. Everything else is still *counted* for velocity — counting is free,
 so the momentum signal is never thrown away.
 
 ---
@@ -164,8 +165,8 @@ on conflict (slug) do nothing;
 
 ## Cost note (answers the "tokens at midnight" concern)
 
-- **LLM:** fixed at ~**12 calls/night** (top-3 × 4 subs), regardless of how wild the crowd is.
-- **Supabase:** aggregates only — a few dozen `reddit_buzz` rows + ≤12 `reddit_threads` rows
+- **LLM:** fixed at ~**4 calls/night** (top-1 × 4 subs), regardless of how wild the crowd is.
+- **Supabase:** aggregates only — a few dozen `reddit_buzz` rows + ≤4 `reddit_threads` rows
   per night. Trivial storage; 3-month retention caps it.
 - **Reddit/Composio:** ~40–60 read calls/night, well under the rate limit.
 
@@ -173,9 +174,9 @@ on conflict (slug) do nothing;
 
 ## Open knobs (defaults chosen; easy to change)
 
-1. **Top-3 / top-10 cut = per subreddit** (assumed). Pooled-across-all-4 is cheaper but WSB
-   dominates every slot.
-2. **Keyword lexicon** — the tier-2 bull/bear word lists live in code, tuned over time.
-3. **Velocity threshold for a "call"** — how big a spike (e.g. ≥3×) writes a `persona_calls`
+1. **Keyword lexicon** — the tier-2 bull/bear word lists live in code, tuned over time.
+2. **Velocity threshold for a "call"** — how big a spike (e.g. ≥3×) writes a `persona_calls`
    row vs. just showing on the board. To decide alongside the streak thresholds (Open
    Decision #5).
+
+*(Decided: LLM top-1 + keyword top-3, both per subreddit — not pooled.)*
