@@ -135,19 +135,37 @@ def _composio_execute(tool_slug: str, arguments: dict) -> dict:
     return r.json()
 
 
+_LIST_KEYS = ("posts_list", "comments_list", "children", "comments", "items")
+
+
 def _children(resp: dict) -> list[dict]:
-    """Pull the Reddit listing children out of Composio's response, tolerating the
-    variable nesting (`data.children` vs an extra `data.data.children` wrapper)."""
+    """Extract post/comment records from Composio's response, tolerating BOTH shapes:
+    the MCP's raw Reddit listing (`children` of `{kind, data}`) and the REST v3 shape
+    (`posts_list` / `comments_list`, each item wrapped as `{"data": {...}}`, no `kind`)."""
     node = resp.get("data", resp) if isinstance(resp, dict) else {}
-    for _ in range(3):  # unwrap up to a couple of `data` layers
-        if isinstance(node, dict) and "children" in node:
+    items = None
+    for _ in range(4):  # descend through nested `data` wrappers until we find a list
+        if not isinstance(node, dict):
             break
-        if isinstance(node, dict) and "data" in node:
-            node = node["data"]
-        else:
+        for key in _LIST_KEYS:
+            if isinstance(node.get(key), list):
+                items = node[key]
+                break
+        if items is not None:
             break
-    children = node.get("children", []) if isinstance(node, dict) else []
-    return [c.get("data", {}) for c in children if isinstance(c, dict) and c.get("kind") in ("t3", "t1")]
+        node = node.get("data") if isinstance(node.get("data"), dict) else None
+        if node is None:
+            break
+    if not items:
+        return []
+    out = []
+    for c in items:
+        if not isinstance(c, dict):
+            continue
+        d = c.get("data") if isinstance(c.get("data"), dict) else c  # unwrap {"data": {...}}
+        if isinstance(d, dict) and d:
+            out.append(d)
+    return out
 
 
 def _fetch_hot(subreddit: str) -> list[dict]:
