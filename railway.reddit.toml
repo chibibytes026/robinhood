@@ -1,0 +1,28 @@
+# Railway config for the Hikikomori Reddit-buzz cron — a SEPARATE service from the
+# main `ingest.daily` cron, pointing at this SAME repo/branch. In the Railway
+# dashboard, set THIS service's "Config as Code" path to `railway.reddit.toml` so it
+# runs its own start command instead of inheriting the root railway.toml's.
+#
+# Runs one command: `ingest.reddit_sentiment` — pulls Reddit buzz across the four
+# trading subreddits (wallstreetbets, stocks, StockMarket, options) via the Composio
+# Reddit connector into Supabase `reddit_buzz` / `reddit_threads` nightly. Composio
+# makes the call from its own servers, so Railway's datacenter IP is never blocked.
+#
+# Required env vars (set in THIS Railway service, never committed):
+#   SUPABASE_URL, SUPABASE_SERVICE_KEY, COMPOSIO_API_KEY, COMPOSIO_REDDIT_ACCOUNT_ID
+# Optional:
+#   ANTHROPIC_API_KEY        — tier-3 "why it's buzzing" read (skipped if unset)
+#   COMPOSIO_BASE_URL        — override if the Composio API version moves
+#   SOCIAL_RETENTION_DAYS    — rolling window, default 90
+# (FINNHUB_API_KEY is NOT needed here — that's the disclosure feeds' key.)
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "python -m ingest.reddit_sentiment"
+# Cron schedule is kept in the Railway service config (dashboard), NOT here — a
+# config-file cron overrides dashboard changes on every deploy and blocks one-off
+# manual runs. Suggested: 0 6 * * *  (06:00 UTC nightly, after the US close).
+# Cron job: run once and exit; do not restart on completion.
+restartPolicyType = "NEVER"

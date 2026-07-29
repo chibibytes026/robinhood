@@ -25,6 +25,10 @@ Env:
   ANTHROPIC_API_KEY                        (optional; tier-3 LLM read skipped if unset)
   SOCIAL_RETENTION_DAYS   default "90"
 
+Deploy: its OWN Railway cron service (config `railway.reddit.toml`, startCommand
+`python -m ingest.reddit_sentiment`) — kept separate from ingest.daily so its Composio
+dependency and cadence are isolated from the core disclosure feeds.
+
 Run:  python -m ingest.reddit_sentiment
 """
 from __future__ import annotations
