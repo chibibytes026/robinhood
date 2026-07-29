@@ -99,7 +99,7 @@ def _resolve_reddit_connection() -> tuple[str, str]:
     if _reddit_conn is not None:
         return _reddit_conn
     api_key, base = _composio_base()
-    r = requests.get(f"{base}/connected_accounts", params={"toolkit_slugs": "reddit"},
+    r = requests.get(f"{base}/connected_accounts", params={"limit": 100},
                      headers={"x-api-key": api_key}, timeout=HTTP_TIMEOUT)
     if not r.ok:
         raise RuntimeError(f"composio connected_accounts {r.status_code}: {r.text[:400]}")
@@ -107,7 +107,10 @@ def _resolve_reddit_connection() -> tuple[str, str]:
     reddit = [it for it in items if (it.get("toolkit") or {}).get("slug") == "reddit"]
     active = [it for it in reddit if it.get("status") == "ACTIVE"] or reddit
     if not active:
-        raise RuntimeError("no reddit connected account found via /connected_accounts")
+        # Log what DOES exist so we can see if reddit is absent (wrong project) or renamed.
+        seen = [((it.get("toolkit") or {}).get("slug"), it.get("status"), it.get("user_id"))
+                for it in items]
+        raise RuntimeError(f"no reddit connected account; {len(items)} accounts seen: {seen}")
     acct = active[0]
     _reddit_conn = (acct.get("user_id"), acct.get("id"))
     log.info("resolved reddit connection: user_id=%s account=%s", *_reddit_conn)
