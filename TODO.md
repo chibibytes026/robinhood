@@ -31,9 +31,15 @@ layers ahead of the simulator:
   AI-infra name (NVDA, CRWV, VST, CEG, BE) showed zero insider buying. Confirms The Insider is
   a low-frequency, contrarian voice by design.
 - **Human-approved execution validated** in the ring-fenced agentic account (see Never, below).
-- **The big remaining blocker is `price_history`** (Finnhub stock candles, Phase 4) — nothing
-  in the backtest → state → voice chain runs until it lands, so the three backtested personas
-  are still voices-without-a-record. That's the single biggest open item.
+- **`price_history` LANDED (2026-07-29).** Split-adjusted daily OHLCV + real dividends via Yahoo
+  (Finnhub candles are premium), 3-month backfill for all watchlist tickers + SPY, daily Railway
+  cron. The backtest → state → voice chain is now unblocked on data. **The next blocker is the
+  simulator itself** (`sim/` is still empty) plus `map_personas.py` (needs a CUSIP→ticker resolve
+  for the 13F persona). Note: `price_history` is a 3-month window — deepen it before backtesting
+  older disclosed trades.
+- **Universe expanded beyond the original 14:** a `💧 Water` theme (AWK, WTRG, AWR, XYL, PNR, VLTO,
+  PHO) was added via a new `securities.watchlist` tag that mirrors the Robinhood watchlists; all
+  ingesters now read the universe from `securities`, so new themes propagate automatically.
 
 ---
 
@@ -94,13 +100,20 @@ Start with **insider Form 4** — highest signal, lowest noise.
 
 ## Phase 4 — Remaining ingestion
 
-- [ ] ⭐ **MAJOR / biggest item:** `ingest/finnhub_prices.py` → `price_history` (Finnhub `stock candles`).
-      This is the single prerequisite for the winners/losers simulation — the backtest → state →
-      voice chain does nothing until historical OHLC exists. Deferred until all personas + feeds land.
-- [ ] Backfill 2 years of daily OHLC for every watchlist ticker + SPY
-- [ ] `ingest/congress.py` → `congress_trades` (parse amount ranges → low/high/midpoint)
-- [ ] `ingest/edgar_13f.py` → `institutional_holdings` (handle put/call legs separately)
-- [ ] `ingest/map_personas.py` → flatten all three into `persona_trades`
+- [x] ⭐ `ingest/prices.py` → `price_history` — DONE. Split-adjusted daily OHLCV + real dividends
+      via Yahoo (Finnhub `stock candles` are premium on the free tier); daily Railway cron; the
+      ticker universe is read from `securities`. (was `finnhub_prices.py`)
+- [~] Backfill depth: currently a **3-month rolling window** (matches news retention), NOT 2 years.
+      ⚠️ backtesting older disclosed trades (insider P-buys go back to 2025-09) needs deeper
+      history — revisit `PRICE_RETENTION_DAYS` before the sim runs.
+- [ ] `ingest/congress.py` → `congress_trades` — ⛔ blocked (congressional feed is premium)
+- [x] `ingest/architect_13f.py` → `institutional_holdings` — DONE. By CUSIP+issuer, put/call legs
+      separate; manifest + coverage/moves views. (was `edgar_13f.py`)
+- [ ] `ingest/map_personas.py` → flatten into `persona_trades` — needs a CUSIP→ticker resolve for
+      the 13F persona (OpenFIGI) before it can feed the sim
+- [x] **Universe is theme-tagged:** `securities.watchlist` mirrors the Robinhood lists (Water ·
+      AI Infra + Power · Mega-Cap Core · Index Anchor); news/insider/prices all read the universe
+      from `securities`, so new themes propagate automatically. 💧 Water added.
 
 ---
 

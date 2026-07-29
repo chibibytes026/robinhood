@@ -25,6 +25,7 @@ create table if not exists securities (
   asset_type     text default 'equity',   -- equity | etf
   form4_eligible boolean default true,     -- files SEC Form 4? false for ETFs / foreign ADRs
   ever_traded    boolean default false,    -- have we bought/sold it in the agentic account
+  watchlist      text,                     -- theme tag, mirrors the Robinhood watchlists (Water | AI Infra + Power | Mega-Cap Core | Index Anchor). Ingesters read the universe from this table.
   created_at     timestamptz default now()
 );
 
@@ -438,6 +439,22 @@ on conflict (ticker) do nothing;
 -- Form-4 eligibility + traded flags (ETFs/ADRs don't file Form 4).
 update securities set form4_eligible = false where asset_type = 'etf' or ticker = 'SONY';
 update securities set ever_traded    = true  where ticker in ('CRWV','SPY','SONY','GOOGL','BE');
+
+-- 💧 Water theme (added 2026-07): utilities + treatment + a water-ETF benchmark.
+insert into securities (ticker, name, sector, asset_type, form4_eligible, watchlist) values
+  ('AWK',  'American Water Works',        'Utilities',   'equity', true,  'Water'),
+  ('WTRG', 'Essential Utilities',         'Utilities',   'equity', true,  'Water'),
+  ('AWR',  'American States Water',       'Utilities',   'equity', true,  'Water'),
+  ('XYL',  'Xylem Inc',                   'Industrials', 'equity', true,  'Water'),
+  ('PNR',  'Pentair plc',                 'Industrials', 'equity', true,  'Water'),
+  ('VLTO', 'Veralto Corp',                'Industrials', 'equity', true,  'Water'),
+  ('PHO',  'Invesco Water Resources ETF', 'Index',       'etf',    false, 'Water')
+on conflict (ticker) do nothing;
+
+-- Theme tags mirroring the Robinhood watchlists (SONY intentionally left untagged).
+update securities set watchlist = 'Mega-Cap Core'    where ticker in ('AVGO','META','AMZN','GOOGL','MSFT','AAPL');
+update securities set watchlist = 'AI Infra + Power' where ticker in ('NVDA','VST','BE','CRWV','CEG');
+update securities set watchlist = 'Index Anchor'     where ticker in ('SPY','VOO');
 
 
 -- ------------------------------------------------------------
