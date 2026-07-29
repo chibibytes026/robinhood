@@ -27,12 +27,12 @@ It exists to make a human a sharper decision-maker. **It does not trade.**
 |---|---|---|---|---|---|
 | `the_house` | 🏛️ The House | *The house always wins.* | Index-broad, bond ballast, effectively passive | backtested P&L | 🟡 In progress |
 | `the_oracle` | 🎯 The Oracle | *Patience, then the strike.* | Rare, concentrated mega-cap tech; LEAPS leverage | backtested P&L | 🟡 In progress |
-| `the_architect` | 🧠 The Architect | *Long the future, short the hype.* | Thesis barbell — long AI infra/power, short the hype | backtested P&L | 🟡 In progress |
+| `the_architect` | 🧠 The Architect | *Long the future, short the hype.* | Thesis barbell — long AI infra/power, short the hype | backtested P&L | 🔵 Ready — 13F feed live; fires when price history lands |
 | `the_herald` | 📯 The Herald | *The signs are written; I only read them aloud.* | News/trend reader across seven watches — the **background voice** | sign clarity, not P&L | 🟢 Active |
 | `the_empath` | 🫀 The Empath | *I speak for the ones you stopped hearing.* | Reader of the `persona_calls` ledger — amplifies the ignored-but-right; **meta voice** | neglect-signal clarity, not P&L | ⚪ Dormant |
 | `the_insider` | 🕵️ The Insider | *The ones who know, buy.* | Follows corporate insiders' open-market Form-4 buys (`P`) — cluster/rank/into-weakness; contrarian, low-frequency | backtested P&L (pending sim) | 🔵 Ready — voice + data live; fires when price history lands |
 
-**Status** (persona lifecycle): 🟢 **Active** = live and feeding calls · 🔵 **Ready** = voice + data feed built, but gated on a missing dependency — fires the moment it lands · 🟡 **In progress** = registered, being built, not yet live · ⚪ **Dormant** = registered but gated / not yet operational. Today only The Herald is live; The Insider is Ready, waiting on price history.
+**Status** (persona lifecycle): 🟢 **Active** = live and feeding calls · 🔵 **Ready** = voice + data feed built, but gated on a missing dependency — fires the moment it lands · 🟡 **In progress** = registered, being built, not yet live · ⚪ **Dormant** = registered but gated / not yet operational. Today only The Herald is live; The Insider and The Architect are Ready, waiting on price history.
 
 The first three are **archetypes of public trading styles** — fictional characters layered
 on public filing data, their register (`winning` / `losing` / `stagnant`) set by computed P&L.
@@ -80,7 +80,7 @@ Where each persona/signal's data comes from, and what's wired vs. pending. Free-
 |---|---|---|---|
 | 📯 The Herald | market + company news | Finnhub (free) | ✅ live — nightly cron → `market_news` |
 | 🕵️ The Insider | Form 4 insider buys | Finnhub insider transactions (free) | ✅ live — nightly cron → `insider_trades` / `insider_buys` |
-| 🧠 The Architect | 13F institutional holdings | SEC EDGAR (free) | ⬜ planned |
+| 🧠 The Architect | 13F institutional holdings | SEC EDGAR (free) | ✅ live — weekly cron → `institutional_holdings` |
 | 🎯 The Oracle · 🏛️ The House | congressional trades | Finnhub congressional = **premium**; no clean free API found (S3 mirrors dead, clerk site IP-blocked) | ⛔ blocked — decision needed |
 | 🫀 The Empath | its own scorecard (ignored-but-right) | internal — the `persona_calls` ledger | ⚪ dormant — gated: needs ≥10 live personas |
 

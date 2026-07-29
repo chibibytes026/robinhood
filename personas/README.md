@@ -33,12 +33,12 @@ personas/<slug>/persona.md
 |---|---|---|---|---|
 | `the_house` | 🏛️ The House | *The house always wins.* | Index-broad, bond ballast, effectively passive | 🟡 In progress |
 | `the_oracle` | 🎯 The Oracle | *Patience, then the strike.* | Rare, concentrated mega-cap tech; LEAPS leverage | 🟡 In progress |
-| `the_architect` | 🧠 The Architect | *Long the future, short the hype.* | Thesis barbell — long AI infra/power, short the hype | 🟡 In progress |
+| `the_architect` | 🧠 The Architect | *Long the future, short the hype.* | Thesis barbell — long AI infra/power, short the hype | 🔵 Ready |
 | `the_herald` | 📯 The Herald | *The signs are written; I only read them aloud.* | News/trend reader across seven watches; **background voice** | 🟢 Active |
 | `the_empath` | 🫀 The Empath | *I speak for the ones you stopped hearing.* | Reader of the `persona_calls` ledger; amplifies the ignored-but-right; **meta voice** | ⚪ Dormant |
 | `the_insider` | 🕵️ The Insider | *The ones who know, buy.* | Whistleblower-gossip on insiders' open-market `P`-buys; cluster/rank/into-weakness; contrarian, low-frequency | 🔵 Ready |
 
-**Status** (persona lifecycle): 🟢 **Active** = live and feeding calls · 🔵 **Ready** = voice + data feed built, gated only on a missing dependency (fires the moment it lands) · 🟡 **In progress** = being built, not yet live · ⚪ **Dormant** = registered but gated (see The Empath). Today only The Herald is live; The Insider is Ready, waiting on price history.
+**Status** (persona lifecycle): 🟢 **Active** = live and feeding calls · 🔵 **Ready** = voice + data feed built, gated only on a missing dependency (fires the moment it lands) · 🟡 **In progress** = being built, not yet live · ⚪ **Dormant** = registered but gated (see The Empath). Today only The Herald is live; The Insider and The Architect are Ready, waiting on price history.
 
 ### A note on The Herald
 
