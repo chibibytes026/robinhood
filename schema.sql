@@ -393,6 +393,106 @@ create index if not exists idx_market_news_published on market_news(published_at
 create index if not exists idx_market_news_watch on market_news(watch, published_at desc);
 create index if not exists idx_market_news_ticker on market_news(ticker, published_at desc);
 
+-- Runtime social-buzz feed for Hikikomori. Populated nightly by the Railway cron
+-- (ingest/reddit_sentiment.py) via the Composio Reddit connector — Composio makes the call
+-- from its OWN servers, so Railway's datacenter IP is never blocked (the wall that killed
+-- GDELT). PURE MOMENTUM: the signal is mention VELOCITY (acceleration), not raw volume.
+-- Aggregates only (a few dozen rows/night); 3-month rolling retention like market_news.
+-- Three-tier funnel per subreddit: count every mention (velocity) -> keyword the top-3 posts
+-- (tilt) -> LLM-read the top-1 post (the story, 4 reads/night).
+create table if not exists reddit_buzz (
+  id           bigint generated always as identity primary key,
+  ticker       text references securities(ticker),
+  buzz_date    date not null,
+  subreddit    text not null,          -- wallstreetbets | stocks | StockMarket | options
+  mentions     int  not null default 0, -- tier 1: count of ALL matched posts/comments
+  bull_kw      int  default 0,          -- tier 2: bullish keyword hits across top-3 posts
+  bear_kw      int  default 0,          -- tier 2: bearish keyword hits across top-3 posts
+  top_score    int,                     -- engagement (score+comments) of the loudest post
+  ingested_at  timestamptz default now(),
+  unique (ticker, buzz_date, subreddit)
+);
+
+create index if not exists idx_reddit_buzz_date on reddit_buzz(buzz_date desc);
+create index if not exists idx_reddit_buzz_ticker on reddit_buzz(ticker, buzz_date desc);
+
+-- The tier-3 deep read: the top-1 post per subreddit we LLM-summarized (4/night).
+-- Hikikomori's VOICE material — the hearsay/thesis it repeats. Grain = per post.
+create table if not exists reddit_threads (
+  id           bigint generated always as identity primary key,
+  post_id      text unique,             -- Reddit base-36 id (dedup key for upsert)
+  subreddit    text,
+  title        text,
+  permalink    text,                    -- link back to the thread
+  score        int,
+  num_comments int,
+  tickers      text[],                  -- symbols this post is about (0..n)
+  summary      text,                    -- LLM: WHY it's buzzing (the story)
+  llm_tilt     text,                    -- LLM read: bull | bear | mixed
+  posted_at    timestamptz,
+  ingested_at  timestamptz default now()
+);
+
+create index if not exists idx_reddit_threads_posted on reddit_threads(posted_at desc);
+
+-- Velocity: today's mentions vs the prior day per ticker (summed across subreddits).
+-- The momentum tell is ACCELERATION, not raw volume. security_invoker respects base RLS.
+create or replace view hikikomori_velocity with (security_invoker = true) as
+select
+  ticker,
+  buzz_date,
+  sum(mentions)                                                    as mentions,
+  lag(sum(mentions)) over (partition by ticker order by buzz_date) as mentions_prev,
+  sum(bull_kw)                                                     as bull_kw,
+  sum(bear_kw)                                                     as bear_kw
+from reddit_buzz
+group by ticker, buzz_date;
+
+-- The Hikikomori board: the latest day's movers ranked by velocity (mentions vs prior day),
+-- with the crude keyword tilt. The persona joins this to reddit_threads for the "story".
+create or replace view hikikomori_board with (security_invoker = true) as
+select
+  v.ticker,
+  v.buzz_date,
+  v.mentions,
+  v.mentions_prev,
+  round(v.mentions::numeric / nullif(v.mentions_prev, 0), 2) as velocity_x,  -- 5.0 = 5x prior day
+  case
+    when v.bull_kw + v.bear_kw = 0 then 'flat'
+    when v.bull_kw >= 2 * greatest(v.bear_kw, 1) then 'bull'
+    when v.bear_kw >= 2 * greatest(v.bull_kw, 1) then 'bear'
+    else 'mixed'
+  end as tilt
+from hikikomori_velocity v
+where v.buzz_date = (select max(buzz_date) from reddit_buzz)
+order by velocity_x desc nulls last, v.mentions desc;
+
+-- Coverage blind spots: US tickers we've TRADED with NO chatter in the last 7 days.
+-- Analog to insider_coverage_gaps — the persona flags silence as a blind spot, not calm.
+create or replace view hikikomori_coverage_gaps with (security_invoker = true) as
+select s.ticker, s.name, s.sector
+from securities s
+where s.ever_traded
+  and not exists (
+    select 1 from reddit_buzz b
+    where b.ticker = s.ticker
+      and b.buzz_date > current_date - 7
+  );
+
+-- Hikikomori signal notes, stored as queryable schema metadata.
+comment on table reddit_buzz is
+ 'Per-day, per-subreddit Reddit mention aggregates for Hikikomori (source: Reddit via '
+ 'Composio). PURE MOMENTUM: the signal is VELOCITY (mentions vs prior day), not raw volume. '
+ 'Tiers: count every mention (velocity) -> keyword top-3 posts/sub (bull_kw/bear_kw tilt) -> '
+ 'LLM top-1 post/sub (see reddit_threads). Unverified hearsay incl. pumps/bots — rides '
+ 'momentum, never fades it; state is P&L-scored (signal-stage until price_history exists).';
+comment on view hikikomori_board is
+ 'Hikikomori daily board: latest-day tickers ranked by velocity_x (mention acceleration) with '
+ 'keyword tilt. Join reddit_threads for the story behind the buzz.';
+comment on view hikikomori_coverage_gaps is
+ 'US traded tickers with no Reddit chatter in the last 7 days — the persona flags silence as a '
+ 'blind spot, not calm.';
+
 
 -- ------------------------------------------------------------
 -- LAYER 6: OPS
@@ -460,6 +560,13 @@ insert into personas (slug, display_name, tagline, style_summary, source_type, s
    'insider', null, false)
 on conflict (slug) do nothing;
 
+-- Hikikomori — signal-stage momentum persona (active=false until price_history scores it).
+insert into personas (slug, display_name, tagline, style_summary, source_type, source_key, active) values
+  ('hikikomori', 'Hikikomori', 'I never leave the room — but I hear everything.',
+   'Momentum reader of the trading subreddits (r/wallstreetbets, r/stocks, r/StockMarket, r/options). PURE MOMENTUM: rides the crowd''s buzz, never fades it; the signal is mention VELOCITY (acceleration), not raw volume. Three-tier funnel per subreddit: count every mention (velocity) -> keyword the top-3 posts (tilt) -> LLM-read the top-1 post (the story, 4 reads/night). Everything is UNVERIFIED HEARSAY incl. pumps/bots — flags the source every line and de-weights itself out loud when cold. Data: Reddit via Composio connector. Signal-stage: not yet a backtested live persona.',
+   'social', null, false)
+on conflict (slug) do nothing;
+
 
 -- ------------------------------------------------------------
 -- SECURITY: enable RLS on every table (no policies).
@@ -482,4 +589,6 @@ alter table public.persona_calls          enable row level security;
 alter table public.persona_reports        enable row level security;
 alter table public.watchlist_signals      enable row level security;
 alter table public.market_news            enable row level security;
+alter table public.reddit_buzz            enable row level security;
+alter table public.reddit_threads         enable row level security;
 alter table public.ingest_runs            enable row level security;
