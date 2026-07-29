@@ -20,9 +20,9 @@ window, and writes an `ingest_runs` audit row. The persona reads `hikikomori_boa
 Env:
   SUPABASE_URL, SUPABASE_SERVICE_KEY       (required)
   COMPOSIO_API_KEY                         (required — Reddit via Composio)
-  COMPOSIO_REDDIT_ACCOUNT_ID               (Composio connected-account id for Reddit)
-  COMPOSIO_USER_ID    default "default"    (Composio entity id; required by v3 execute)
   COMPOSIO_BASE_URL   default v3 execute   (backend.composio.dev/api/v3)
+  (the Reddit connection's user_id + connected_account_id are auto-resolved at runtime
+   from /connected_accounts — no need to set COMPOSIO_REDDIT_ACCOUNT_ID / COMPOSIO_USER_ID)
   ANTHROPIC_API_KEY                        (optional; tier-3 LLM read skipped if unset)
   SOCIAL_RETENTION_DAYS   default "90"
 
@@ -80,25 +80,47 @@ HAIKU = "claude-haiku-4-5-20251001"   # cheap model for the tier-3 read
 
 # --------------------------------------------------------------------------- Composio
 
-def _composio_execute(tool_slug: str, arguments: dict) -> dict:
-    """Execute a Composio tool from a headless process (Railway) via the REST v3 API.
+def _composio_base() -> tuple[str, str]:
+    return (os.environ["COMPOSIO_API_KEY"],
+            os.environ.get("COMPOSIO_BASE_URL", "https://backend.composio.dev/api/v3"))
 
-    Confirmed contract (Composio v3 `POST /tools/execute/{slug}`, header `x-api-key`):
-    the body needs BOTH `user_id` (the entity identifier — Composio error 1811 requires
-    it alongside a connected account) AND `connected_account_id`, plus `arguments`.
-    `user_id` defaults to "default" (the standard entity); override via COMPOSIO_USER_ID
-    if the connection lives under a different entity. Base URL overridable via
-    COMPOSIO_BASE_URL. On a non-2xx we raise Composio's body verbatim for diagnosis.
+
+_reddit_conn: "tuple[str, str] | None" = None   # (user_id, connected_account_id), cached
+
+
+def _resolve_reddit_connection() -> tuple[str, str]:
+    """Auto-resolve the ACTIVE Reddit connection's real (user_id, connected_account_id) from
+    Composio's /connected_accounts — so we never hardcode account-specific ids.
+
+    The MCP's word_id (e.g. reddit_torus-vervel) is NOT the REST connected_account_id
+    (a `ca_...` nanoid), and the entity is not 'default' — both must come from the API.
     """
-    api_key = os.environ["COMPOSIO_API_KEY"]
-    base = os.environ.get("COMPOSIO_BASE_URL", "https://backend.composio.dev/api/v3")
-    payload: dict = {
-        "user_id": os.environ.get("COMPOSIO_USER_ID", "default"),
-        "arguments": arguments,
-    }
-    account = os.environ.get("COMPOSIO_REDDIT_ACCOUNT_ID")
-    if account:
-        payload["connected_account_id"] = account
+    global _reddit_conn
+    if _reddit_conn is not None:
+        return _reddit_conn
+    api_key, base = _composio_base()
+    r = requests.get(f"{base}/connected_accounts", params={"toolkit_slugs": "reddit"},
+                     headers={"x-api-key": api_key}, timeout=HTTP_TIMEOUT)
+    if not r.ok:
+        raise RuntimeError(f"composio connected_accounts {r.status_code}: {r.text[:400]}")
+    items = (r.json() or {}).get("items", [])
+    reddit = [it for it in items if (it.get("toolkit") or {}).get("slug") == "reddit"]
+    active = [it for it in reddit if it.get("status") == "ACTIVE"] or reddit
+    if not active:
+        raise RuntimeError("no reddit connected account found via /connected_accounts")
+    acct = active[0]
+    _reddit_conn = (acct.get("user_id"), acct.get("id"))
+    log.info("resolved reddit connection: user_id=%s account=%s", *_reddit_conn)
+    return _reddit_conn
+
+
+def _composio_execute(tool_slug: str, arguments: dict) -> dict:
+    """Execute a Composio tool via the REST v3 API (POST /tools/execute/{slug}, header
+    x-api-key). Body needs user_id (entity) + connected_account_id + arguments; BOTH ids
+    are auto-resolved from /connected_accounts. On a non-2xx we raise the body verbatim."""
+    api_key, base = _composio_base()
+    user_id, account_id = _resolve_reddit_connection()
+    payload = {"user_id": user_id, "connected_account_id": account_id, "arguments": arguments}
     r = requests.post(
         f"{base}/tools/execute/{tool_slug}",
         headers={"x-api-key": api_key, "Content-Type": "application/json"},
@@ -106,23 +128,8 @@ def _composio_execute(tool_slug: str, arguments: dict) -> dict:
         timeout=HTTP_TIMEOUT,
     )
     if not r.ok:
-        # Surface Composio's error body verbatim — it names the offending field, which is
-        # the fastest way to pin the exact v3 request shape from the Railway logs.
         raise RuntimeError(f"composio {r.status_code} {tool_slug}: {r.text[:600]}")
     return r.json()
-
-
-def _composio_debug_accounts() -> None:
-    """One-shot diagnostic (Railway only): log the real connected-account ids + entity/user
-    ids Composio knows, so we can wire the exact identifiers. Remove once resolved."""
-    api_key = os.environ["COMPOSIO_API_KEY"]
-    base = os.environ.get("COMPOSIO_BASE_URL", "https://backend.composio.dev/api/v3")
-    try:
-        r = requests.get(f"{base}/connected_accounts",
-                         headers={"x-api-key": api_key}, timeout=HTTP_TIMEOUT)
-        log.info("DEBUG connected_accounts %s: %s", r.status_code, r.text[:2000])
-    except Exception as e:  # noqa: BLE001
-        log.warning("DEBUG connected_accounts probe failed: %s", e)
 
 
 def _children(resp: dict) -> list[dict]:
@@ -306,7 +313,6 @@ def main() -> None:
 
     log.info("reddit ingest starting; composio_key=%s subs=%s tickers=%d",
              bool(os.environ.get("COMPOSIO_API_KEY")), SUBREDDITS, len(valid))
-    _composio_debug_accounts()   # TEMP: log real account/entity ids, then remove
 
     buzz_rows: list[dict] = []
     thread_rows: list[dict] = []
