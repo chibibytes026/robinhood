@@ -119,9 +119,9 @@ Start with **insider Form 4** — highest signal, lowest noise.
 
 ## Phase 5 — Simulator
 
-- [ ] **Decide:** `price_basis` = `close_to_close` or `next_open`
-- [ ] **Decide:** copy-ticker-only, or mirror-their-size (ranges → midpoint)
-- [ ] **Decide:** `hold_days` = calendar or trading days
+- [x] **Decided:** `price_basis` = **`next_open`** (can't fill on a close you're reacting to)
+- [x] **Decided:** **fixed $ per trade** (copy the ticker, not the size — isolates selection skill)
+- [x] **Decided:** `hold_days` = **trading days**, two horizons **21 / 63**
 - [ ] `sim/backtest.py` — single-trade backtest, fractional shares to 6dp
 - [ ] Weekend/holiday roll-back to prior trading day
 - [ ] SPY benchmark over the identical window → `alpha_pct`
@@ -135,7 +135,7 @@ Start with **insider Form 4** — highest signal, lowest noise.
 ## Phase 6 — Streak classifier
 
 - [ ] `sim/streak.py` — hit_rate, net_return, alpha_vs_spy, streak_run, trend
-- [ ] Define exact thresholds for `winning` / `losing` / `stagnant` — write them down
+- [x] Define exact thresholds for `winning` / `losing` / `stagnant` — locked in "Open decisions" #5
 - [ ] Compute per persona × 30d/90d windows
 - [ ] Write to `persona_performance`
 - [ ] **Checkpoint:** all three personas show a real, earned state
@@ -157,7 +157,10 @@ Start with **insider Form 4** — highest signal, lowest noise.
 
 ---
 
-## Phase 8 — Reports
+## Phase 8 — Reports (optional under the Zork model)
+
+> Not a prerequisite for the terminal sim — the REPL narrates live from `persona_performance` +
+> `backtests`. Pre-written reports are optional flavor/history, not required plumbing.
 
 - [ ] `reports/generate.py` — pull metrics + voice bible → Anthropic API → `persona_reports`
 - [ ] Monthly template: scoreboard line first, then in-voice narrative
@@ -172,7 +175,7 @@ Start with **insider Form 4** — highest signal, lowest noise.
 - [x] `railway.toml` (`ingest.daily`, `restartPolicyType = NEVER`; cron schedule kept in the
       service config, not the toml, so one-off manual runs aren't overridden on deploy)
 - [x] Cron: ingest (daily, ~06:00 UTC — news + insider via `ingest.daily`)
-- [ ] Cron: sim + streak (chained after ingest) — blocked on the simulator (needs `price_history`)
+- [ ] Cron: sim + streak (chained after ingest) — blocked on the simulator (`price_history` landed; `sim/` still empty)
 - [ ] Cron: reports (1st of month, 1st of quarter)
 - [x] Env vars set in Railway dashboard (`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `FINNHUB_API_KEY`)
 - [ ] Failure alerting (Discord webhook — same pattern as the bot crew)
@@ -180,13 +183,17 @@ Start with **insider Form 4** — highest signal, lowest noise.
 
 ---
 
-## Phase 10 — Interactive layer
+## Phase 10 — Interactive layer (Zork-style terminal)
 
-- [ ] Install Claude Desktop, move off Chrome
-- [ ] Confirm Supabase + Robinhood MCPs both live in the desktop app
-- [ ] Write the query prompt: `@<persona>, what's the play this morning?`
-- [ ] Verify retrieval pulls: voice bible + streak + latest reports + recent trades + quotes
-- [ ] Confirm a cold persona actually de-weights its own advice
+> **Model:** the sim runs like **Zork in a terminal** — a text REPL, no GUI, no wrapper, no
+> visualization. You type at a persona; it reads state from Supabase and answers in prose.
+> The sim is headless (writes `backtests` / `persona_performance`); this is the read side.
+
+- [ ] `sim/terminal.py` — text REPL: `@<persona> <question>` → pull state → answer in-voice
+- [ ] Retrieval per turn: voice bible + `persona_performance` (streak) + recent `backtests` /
+      `persona_trades` + live quotes (Robinhood MCP) — no dashboards/reports required
+- [ ] Confirm a cold persona actually de-weights its own advice (state drives voice)
+- [ ] ~~Install Claude Desktop, move off Chrome~~ — **dropped**: it's a terminal CLI, not a GUI
 
 ---
 
@@ -203,11 +210,11 @@ Start with **insider Form 4** — highest signal, lowest noise.
 
 | # | Decision | Status |
 |---|---|---|
-| 1 | `price_basis`: close-to-close or next-day open | ⬜ |
-| 2 | Copy ticker only, or mirror position size | ⬜ |
-| 3 | `hold_days`: calendar or trading days | ⬜ |
-| 4 | Final persona names | ⬜ |
-| 5 | Streak thresholds (exact numbers) | ⬜ |
+| 1 | `price_basis` | ✅ **next_open** |
+| 2 | Copy ticker vs. mirror size | ✅ **fixed $ / trade** (copy the ticker, not the size) |
+| 3 | `hold_days` | ✅ **trading days**, 21 / 63 |
+| 4 | Final persona names | ⬜ (cosmetic — not sim-blocking) |
+| 5 | Streak thresholds | ✅ `winning` = alpha>0 **and** hit_rate≥0.55 **and** streak_run≥+1 · `losing` = alpha<0 **and** (hit_rate≤0.45 **or** streak_run≤−3) · `stagnant` = otherwise |
 
 ---
 

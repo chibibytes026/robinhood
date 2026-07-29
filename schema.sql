@@ -264,6 +264,17 @@ create index if not exists idx_ptrades_persona_date on persona_trades(persona, t
 
 -- ------------------------------------------------------------
 -- LAYER 4: SIMULATION
+--
+-- The sim is a HEADLESS terminal program — no GUI, no dashboard, no visualization.
+-- The interactive layer runs like *Zork in a terminal*: a text REPL where you type
+-- "@<persona> <question>" and it answers in-character.
+--   sim/backtest.py  — replays each persona's disclosed trades against price_history,
+--                      writes one row per trade to `backtests`.
+--   sim/streak.py    — classifies those into a state, writes `persona_performance`.
+--   sim/terminal.py  — the Zork REPL; reads persona_performance + backtests +
+--                      persona_calls + the repo voice bible, narrates. Data -> state -> voice.
+-- Locked knobs: price_basis = next_open · fixed $/trade (selection, not sizing) ·
+--   hold_days in TRADING days (21 / 63). See TODO.md "Open decisions" for streak thresholds.
 -- ------------------------------------------------------------
 
 -- One row per backtested trade. Fractional shares carried to 6 decimals —
@@ -347,7 +358,8 @@ create index if not exists idx_persona_calls_open on persona_calls(scored_date) 
 -- ------------------------------------------------------------
 
 -- In-voice monthly/quarterly writeups, generated from backtests + persona_performance.
--- This is what Claude retrieves at query time.
+-- Optional under the Zork terminal model — the REPL can narrate live from state; these
+-- are pre-baked flavor/history, not required plumbing. This is what Claude retrieves.
 create table if not exists persona_reports (
   id             bigint generated always as identity primary key,
   persona        text references personas(slug),
