@@ -155,7 +155,12 @@ def _fetch_hot(subreddit: str) -> list[dict]:
         "REDDIT_RETRIEVE_REDDIT_POST",
         {"subreddit": subreddit, "sort": "hot", "max_results": 100},
     )
-    return _children(resp)
+    kids = _children(resp)
+    if not kids:
+        import json as _json
+        log.warning("DEBUG fetch %s: 0 posts parsed; shape=%s",
+                    subreddit, _json.dumps(resp)[:900] if isinstance(resp, dict) else type(resp))
+    return kids
 
 
 def _fetch_comments(article_id: str) -> list[dict]:
@@ -264,13 +269,19 @@ def _process_subreddit(sub: str, valid: set[str], today: str) -> tuple[list[dict
             mentions[tkr] = mentions.get(tkr, 0) + 1
 
     megathread = max(posts, key=lambda p: p.get("num_comments") or 0, default=None)
+    n_comments = 0
     if megathread and megathread.get("id"):
         try:
-            for c in _fetch_comments(megathread["id"]):
+            comments = _fetch_comments(megathread["id"])
+            n_comments = len(comments)
+            for c in comments:
                 for tkr in _extract_tickers(c.get("body", ""), valid):
                     mentions[tkr] = mentions.get(tkr, 0) + 1
         except Exception as e:  # noqa: BLE001
             log.warning("comment fetch failed for %s/%s: %s", sub, megathread.get("id"), e)
+
+    log.info("DEBUG sub %s: %d posts, %d megathread-comments, %d tickers mentioned (%s)",
+             sub, len(posts), n_comments, len(mentions), dict(list(mentions.items())[:8]))
 
     # Tier 2 — keyword the top 3 posts, attributing sentiment to the tickers each names.
     bull: dict[str, int] = {}
