@@ -16,11 +16,12 @@ layers ahead of the simulator:
   `market_news`, `persona_calls` (the "you should have listened" ledger), `insider_trades`,
   plus the `insider_buys` and `insider_coverage_gaps` views and `securities.form4_eligible` /
   `ever_traded` flags — all documented with `COMMENT ON`.
-- **Six personas registered** (was three): 🏛️ The House, 🎯 The Oracle, 🧠 The Architect,
-  📯 **The Herald** (news/trend reader — the only *live* voice, plain Buy/Watch/Avoid table
-  first, then flavor; 3-month headline archive), 🫀 **The Empath** (meta voice reading the
-  `persona_calls` ledger — dormant until ≥10 live personas), 🕵️ **The Insider** (Form-4
-  `P`-buy follower — data live, no voice bible yet). See `README.md` for the full status table.
+- **Seven personas registered** (was three): 🏛️ The House, 🎯 The Oracle, 🧠 The Architect,
+  📯 **The Herald** (news/trend reader — live, plain Buy/Watch/Avoid table first, then flavor;
+  3-month headline archive), 🫀 **The Empath** (meta voice reading the `persona_calls` ledger —
+  dormant until ≥10 live personas), 🕵️ **The Insider** (Form-4 `P`-buy follower — data live +
+  voice bible), and 🛋️ **The Shut-In** (`the_shutin` — Reddit momentum reader; renamed from
+  Hikikomori). See `README.md` for the full status table.
 - **Ingestion live on Railway** (not EDGAR-first as originally planned — Finnhub-first, since
   it's the one source Railway's network can reach; Finnhub is 403-blocked from the agent
   session). `ingest/daily.py` runs `news` + `insider` nightly → `market_news` /
@@ -40,6 +41,15 @@ layers ahead of the simulator:
 - **Universe expanded beyond the original 14:** a `💧 Water` theme (AWK, WTRG, AWR, XYL, PNR, VLTO,
   PHO) was added via a new `securities.watchlist` tag that mirrors the Robinhood watchlists; all
   ingesters now read the universe from `securities`, so new themes propagate automatically.
+- **🛋️ The Shut-In's Reddit feed is LIVE (2026-07-29).** A dedicated Railway cron
+  (`railway.reddit.toml` → `ingest/reddit_sentiment.py`) pulls the four trading subreddits via the
+  **Composio** Reddit connector (Composio makes the call, so no datacenter-IP block) into
+  `reddit_buzz` / `reddit_threads`; the `the_shutin_board` view ranks by mention **velocity**.
+  First live run landed 19 buzz + 4 story rows (MSFT/GOOGL/NVDA leading). Three-tier funnel:
+  count-all → keyword-top-3 → LLM-top-1 per sub, ~4 LLM reads/night. Still signal-stage
+  (`active=false`) until the simulator scores buzz→returns. Composio gotcha logged: the REST v3
+  API needs `user_id` + the real `ca_` account id (not the MCP's word alias), and wraps results
+  as `data.posts_list` (not `data.children`).
 
 ---
 

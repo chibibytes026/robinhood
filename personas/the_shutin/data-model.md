@@ -1,4 +1,4 @@
-# Hikikomori — data-model sketch
+# The Shut-In — data-model sketch
 
 **Status: proposal, NOT applied.** Nothing here is in `schema.sql` or the live Supabase
 project yet. This is the shape to review before any ingestion is written. Conventions match
@@ -71,7 +71,7 @@ create index if not exists idx_reddit_buzz_date on reddit_buzz(buzz_date desc);
 create index if not exists idx_reddit_buzz_ticker on reddit_buzz(ticker, buzz_date desc);
 
 -- The tier-3 deep read: the top-3 posts per subreddit we actually LLM-summarized.
--- This is Hikikomori's VOICE material — the hearsay/thesis it repeats. Grain = per post.
+-- This is The Shut-In's VOICE material — the hearsay/thesis it repeats. Grain = per post.
 create table if not exists reddit_threads (
   id           bigint generated always as identity primary key,
   post_id      text unique,             -- Reddit base-36 id (dedup key)
@@ -95,7 +95,7 @@ create index if not exists idx_reddit_threads_posted on reddit_threads(posted_at
 ```sql
 -- Velocity: today's mentions vs the prior day, per ticker (summed across subreddits).
 -- This is the momentum tell — acceleration, not raw volume. security_invoker respects RLS.
-create or replace view hikikomori_velocity with (security_invoker = true) as
+create or replace view the_shutin_velocity with (security_invoker = true) as
 select
   ticker,
   buzz_date,
@@ -106,9 +106,9 @@ select
 from reddit_buzz
 group by ticker, buzz_date;
 
--- The Hikikomori board: today's movers ranked by velocity (mentions vs prior day),
+-- The The Shut-In board: today's movers ranked by velocity (mentions vs prior day),
 -- with the crude keyword tilt. The persona joins this to reddit_threads for the "story".
-create or replace view hikikomori_board with (security_invoker = true) as
+create or replace view the_shutin_board with (security_invoker = true) as
 select
   v.ticker,
   v.buzz_date,
@@ -121,13 +121,13 @@ select
     when v.bear_kw >= 2 * greatest(v.bull_kw, 1) then 'bear'
     else 'mixed'
   end as tilt
-from hikikomori_velocity v
+from the_shutin_velocity v
 where v.buzz_date = (select max(buzz_date) from reddit_buzz)
 order by velocity_x desc nulls last, v.mentions desc;
 
 -- Coverage blind spots: US tickers we've TRADED that the feed isn't discussing at all.
 -- Analog to insider_coverage_gaps — the persona flags silence as a blind spot, not calm.
-create or replace view hikikomori_coverage_gaps with (security_invoker = true) as
+create or replace view the_shutin_coverage_gaps with (security_invoker = true) as
 select s.ticker, s.name, s.sector
 from securities s
 where s.ever_traded
@@ -146,8 +146,8 @@ beyond the window.
 
 ## Scoring path (how it earns a state — gated on `price_history`)
 
-Hikikomori's board entries become **calls** written into the existing `persona_calls` ledger
-(`persona = 'hikikomori'`, `verdict = 'speculative'` for a hot name, `call_price` = price at
+The Shut-In's board entries become **calls** written into the existing `persona_calls` ledger
+(`persona = 'the_shutin'`, `verdict = 'speculative'` for a hot name, `call_price` = price at
 call time). Once `price_history` lands, the same scorer that grades every persona compares
 `call_price → score_price` and sets `verdict_correct` / `alpha_pct`. That scored record rolls
 into `persona_performance` and finally gives it a real `winning`/`losing`/`stagnant` state —
@@ -158,7 +158,7 @@ into `persona_performance` and finally gives it a real `winning`/`losing`/`stagn
 ```sql
 -- personas seed row (source_type 'social' is a new value alongside congress|insider|institutional)
 insert into personas (slug, display_name, tagline, style_summary, source_type, source_key, active)
-values ('hikikomori', 'Hikikomori', 'I never leave the room — but I hear everything.',
+values ('the_shutin', 'The Shut-In', 'I never leave the room — but I hear everything.',
         '<style_summary from persona.md>', 'social', null, false)   -- active=false: signal-stage
 on conflict (slug) do nothing;
 ```

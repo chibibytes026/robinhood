@@ -1,4 +1,4 @@
-"""Nightly Reddit social-buzz ingestion for Hikikomori (pure-momentum persona).
+"""Nightly Reddit social-buzz ingestion for The Shut-In (pure-momentum persona).
 
 Runs headless on Railway (cron) — no browser. Reddit is reached through the **Composio**
 connector: Composio executes the call from ITS OWN servers and returns JSON, so Railway's
@@ -7,7 +7,7 @@ confirmed live; see the ⚠️ note on `_composio_execute` for the one thing to 
 first Railway run.
 
 Pure momentum — the signal is mention VELOCITY (acceleration), computed by the
-`hikikomori_velocity` view, not here. This module only writes today's raw counts. A
+`the_shutin_velocity` view, not here. This module only writes today's raw counts. A
 three-tier funnel per subreddit keeps cost fixed regardless of how wild the crowd is:
 
   tier 1 — count every ticker mention (incl. the daily-megathread comments) -> `mentions`
@@ -15,7 +15,7 @@ three-tier funnel per subreddit keeps cost fixed regardless of how wild the crow
   tier 3 — LLM-read the top 1 post (4 reads/night total)                    -> reddit_threads
 
 Writes aggregates into Supabase `reddit_buzz` + `reddit_threads`, trims the rolling 3-month
-window, and writes an `ingest_runs` audit row. The persona reads `hikikomori_board` at runtime.
+window, and writes an `ingest_runs` audit row. The persona reads `the_shutin_board` at runtime.
 
 Env:
   SUPABASE_URL, SUPABASE_SERVICE_KEY       (required)
@@ -49,7 +49,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 
 HTTP_TIMEOUT = 30
 
-# The four highest-momentum trading subreddits (see personas/hikikomori/persona.md).
+# The four highest-momentum trading subreddits (see personas/the_shutin/persona.md).
 SUBREDDITS = ["wallstreetbets", "stocks", "StockMarket", "options"]
 
 # Only count mentions of names we actually care about (watchlist + traded). Mirrors the

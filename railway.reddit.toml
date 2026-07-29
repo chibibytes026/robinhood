@@ -1,4 +1,4 @@
-# Railway config for the Hikikomori Reddit-buzz cron — a SEPARATE service from the
+# Railway config for The Shut-In's Reddit-buzz cron — a SEPARATE service from the
 # main `ingest.daily` cron, pointing at this SAME repo/branch. In the Railway
 # dashboard, set THIS service's "Config as Code" path to `railway.reddit.toml` so it
 # runs its own start command instead of inheriting the root railway.toml's.

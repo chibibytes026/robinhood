@@ -2,7 +2,7 @@
 #
 # One cron service runs one command: `ingest.daily`, which pulls prices + news +
 # insider + 13F into Supabase every night so the bots have fresh data to call upon
-# in the morning. The Reddit/Hikikomori, sim+streak, and reports crons are SEPARATE
+# in the morning. The Reddit/The Shut-In, sim+streak, and reports crons are SEPARATE
 # Railway services pointing at this same repo, each with its own startCommand +
 # cronSchedule. Reddit uses its own config file `railway.reddit.toml` (set that as
 # the service's "Config as Code" path) so it runs ingest.reddit_sentiment, not this.

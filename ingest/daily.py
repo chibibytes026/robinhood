@@ -31,7 +31,7 @@ def main() -> None:
     _run("news", news.main)
     _run("insider", insider.main)
     _run("architect_13f", architect_13f.main)   # SEC 13F → The Architect (quarterly; no-ops between filings)
-    # NOTE: Reddit/Hikikomori is NOT here — it runs as its OWN Railway cron service
+    # NOTE: Reddit/The Shut-In is NOT here — it runs as its OWN Railway cron service
     # (startCommand: python -m ingest.reddit_sentiment). Kept separate so its Composio
     # dependency and cadence are isolated from the core disclosure feeds.
 

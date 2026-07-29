@@ -31,9 +31,9 @@ It exists to make a human a sharper decision-maker. **It does not trade.**
 | `the_herald` | 📯 The Herald | *The signs are written; I only read them aloud.* | News/trend reader across seven watches — the **background voice** | sign clarity, not P&L | 🟢 Active |
 | `the_empath` | 🫀 The Empath | *I speak for the ones you stopped hearing.* | Reader of the `persona_calls` ledger — amplifies the ignored-but-right; **meta voice** | neglect-signal clarity, not P&L | ⚪ Dormant |
 | `the_insider` | 🕵️ The Insider | *The ones who know, buy.* | Follows corporate insiders' open-market Form-4 buys (`P`) — cluster/rank/into-weakness; contrarian, low-frequency | backtested P&L (pending sim) | 🔵 Ready — voice + data live; fires when price history lands |
-| `hikikomori` | 🛋️ Hikikomori | *I never leave the room — but I hear everything.* | Momentum reader of the trading subreddits — velocity of crowd buzz; rides hype, never fades | backtested P&L (pending sim) | 🟡 In progress — voice + data model drafted, no ingestion |
+| `the_shutin` | 🛋️ The Shut-In | *I never leave the room — but I hear everything.* | Momentum reader of the trading subreddits — velocity of crowd buzz; rides hype, never fades | backtested P&L (pending sim) | 🔵 Ready — voice + live nightly feed; fires when price history lands |
 
-**Status** (persona lifecycle): 🟢 **Active** = live and feeding calls · 🔵 **Ready** = voice + data feed built, but gated on a missing dependency — fires the moment it lands · 🟡 **In progress** = registered, being built, not yet live · ⚪ **Dormant** = registered but gated / not yet operational (an unmet dependency or a paywalled feed). Today only The Herald is live; The Insider and The Architect are Ready, waiting on price history; Hikikomori is In progress (its Reddit momentum feed isn't built yet); The House and The Oracle are Dormant until their congressional feed is paid for or replaced.
+**Status** (persona lifecycle): 🟢 **Active** = live and feeding calls · 🔵 **Ready** = voice + data feed built, but gated on a missing dependency — fires the moment it lands · 🟡 **In progress** = registered, being built, not yet live · ⚪ **Dormant** = registered but gated / not yet operational (an unmet dependency or a paywalled feed). Today only The Herald is live; The Insider, The Architect, and The Shut-In are Ready, waiting on price history (The Shut-In's Reddit feed runs nightly already); The House and The Oracle are Dormant until their congressional feed is paid for or replaced.
 
 The first three are **archetypes of public trading styles** — fictional characters layered
 on public filing data, their register (`winning` / `losing` / `stagnant`) set by computed P&L.
@@ -70,15 +70,17 @@ CEOs and CFOs and leans across the table to tell you who's quietly buying their 
 you touch it — but she only ever gossips what a filing can prove, and de-weights herself when her
 record's cold. See [`personas/the_insider/persona.md`](./personas/the_insider/persona.md).
 
-**Hikikomori is a seventh voice — the crowd's echo.** A terminally-online shut-in that reads
-the four highest-momentum trading subreddits (r/wallstreetbets, r/stocks, r/StockMarket,
-r/options) and reports what retail is piling into, ranked by **velocity** — accelerating
-attention, not raw volume. **Pure momentum:** it rides the buzz and never fades it, and it flags
-everything as unverified hearsay (pumps and bots included, since riding momentum means riding
-those too). Like the backtested voices, its register is set by P&L, so it stays signal-stage
+**The Shut-In is a seventh voice — the crowd's echo.** A terminally-online shut-in (named for
+the *hikikomori* archetype) that reads the four highest-momentum trading subreddits
+(r/wallstreetbets, r/stocks, r/StockMarket, r/options) and reports what retail is piling into,
+ranked by **velocity** — accelerating attention, not raw volume. **Pure momentum:** it rides the
+buzz and never fades it, and it flags everything as unverified hearsay (pumps and bots included,
+since riding momentum means riding those too). Its **feed is live** — a dedicated nightly Railway
+cron pulls Reddit via Composio into `reddit_buzz` / `the_shutin_board` (first run: MSFT/GOOGL/NVDA
+leading). Like the backtested voices, its register is set by P&L, so it stays signal-stage
 (`active=false`) until price history exists to grade whether the hot names actually moved; its
-calls drop into `persona_calls`, so once scored it feeds the Empath too. Voice + data model are
-drafted; no ingestion yet. See [`personas/hikikomori/persona.md`](./personas/hikikomori/persona.md).
+calls drop into `persona_calls`, so once scored it feeds the Empath too. See
+[`personas/the_shutin/persona.md`](./personas/the_shutin/persona.md).
 
 All seven are fictional characters. Not the real individuals, not their opinions, not
 financial advice.
@@ -91,7 +93,7 @@ Where each persona/signal's data comes from, and what's wired vs. pending. Free-
 |---|---|---|---|
 | 📯 The Herald | market + company news | Finnhub (free) | ✅ live — nightly cron → `market_news` |
 | 🕵️ The Insider | Form 4 insider buys | Finnhub insider transactions (free) | ✅ live — nightly cron → `insider_trades` / `insider_buys` |
-| 🛋️ Hikikomori | trading-subreddit buzz | Reddit via Composio connector (free) | 🟡 drafted — voice + data model; no ingestion yet |
+| 🛋️ The Shut-In | trading-subreddit buzz | Reddit via Composio connector (free) | ✅ live — nightly cron → `reddit_buzz` / `the_shutin_board` |
 | 🧠 The Architect | 13F institutional holdings | SEC EDGAR (free) | ✅ live — weekly cron → `institutional_holdings` |
 | 🎯 The Oracle · 🏛️ The House | congressional trades | Finnhub congressional = **premium**; no clean free API found (S3 mirrors dead, clerk site IP-blocked) | ⛔ blocked — decision needed |
 | 🫀 The Empath | its own scorecard (ignored-but-right) | internal — the `persona_calls` ledger | ⚪ dormant — gated: needs ≥10 live personas |
