@@ -1,9 +1,9 @@
 """Finnhub insider-transactions ingester (SEC Form 4).
 
-Relevance test + first insider feed. Pulls insider transactions for every
-watchlist ticker plus any we've ever traded, into `insider_trades`. Reveals how
-relevant the data is: US operating companies should have rows; ETFs (SPY/VOO) and
-foreign ADRs (SONY) should return nothing (no Form 4 filers).
+Relevance test + first insider feed. Pulls insider transactions for every ticker in
+the `securities` universe, into `insider_trades`. Reveals how relevant the data is:
+US operating companies should have rows; ETFs (SPY/VOO) and foreign ADRs (SONY) should
+return nothing (no Form 4 filers).
 
 Free tier note: Finnhub returns the most recent ~top-25 insider transactions per
 symbol and does NOT include the insider's title/relationship (SEC Form 4 has it;
@@ -29,7 +29,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 FINNHUB_BASE = "https://finnhub.io/api/v1"
 HTTP_TIMEOUT = 30
 
-# Watchlist tickers + everything we've ever bought/sold in the agentic account.
+# Fallback if the securities read fails. Normally the universe is read from the
+# `securities` table at runtime (so new themes like Water propagate automatically).
 SYMBOLS = [
     "NVDA", "VST", "BE", "CRWV", "CEG",
     "AAPL", "MSFT", "GOOGL", "AMZN", "META", "AVGO",
@@ -83,14 +84,19 @@ def main() -> None:
     if not token:
         raise SystemExit("FINNHUB_API_KEY unset")
 
-    ensure_securities(client, SYMBOLS)
+    try:
+        res = client.table("securities").select("ticker").execute()
+        symbols = sorted(r["ticker"] for r in (res.data or []) if r.get("ticker")) or SYMBOLS
+    except Exception:  # noqa: BLE001
+        symbols = SYMBOLS
+    ensure_securities(client, symbols)
 
     total = 0
     per_ticker: dict[str, int] = {}
     all_rows: list[dict] = []
     errors: list[str] = []
 
-    for sym in SYMBOLS:
+    for sym in symbols:
         try:
             data = fetch_insider(token, sym)
             rows = to_rows(sym, data)
@@ -112,7 +118,7 @@ def main() -> None:
     # Relevance summary — which tickers actually carry insider data.
     have = sorted([s for s, n in per_ticker.items() if n], key=lambda s: -per_ticker[s])
     none = [s for s, n in per_ticker.items() if not n]
-    log.info("RELEVANCE: %d/%d symbols have insider data", len(have), len(SYMBOLS))
+    log.info("RELEVANCE: %d/%d symbols have insider data", len(have), len(symbols))
     log.info("  with data : %s", ", ".join(f"{s}={per_ticker[s]}" for s in have))
     log.info("  empty     : %s", ", ".join(none))
 

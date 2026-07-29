@@ -34,7 +34,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 FINNHUB_BASE = "https://finnhub.io/api/v1"
 HTTP_TIMEOUT = 30
 
-# Watchlist tickers (mirror the securities seed). Company news is pulled per ticker.
+# Fallback watchlist if the securities read fails. Normally the universe is read from
+# the `securities` table at runtime (so new themes like Water propagate automatically).
 WATCHLIST = [
     "NVDA", "VST", "BE", "CRWV", "CEG",
     "AAPL", "MSFT", "GOOGL", "AMZN", "META", "AVGO",
@@ -141,11 +142,13 @@ def main() -> None:
 
     log.info("news ingest starting; finnhub_key=%s lookback=%sd", bool(token), days)
     try:
-        probe = client.table("securities").select("ticker").limit(1).execute()
-        log.info("supabase reachable; securities probe rows=%d", len(probe.data or []))
+        res = client.table("securities").select("ticker").execute()
+        watchlist = sorted(r["ticker"] for r in (res.data or []) if r.get("ticker")) or WATCHLIST
+        log.info("supabase reachable; %d tickers from securities", len(watchlist))
     except Exception as e:  # noqa: BLE001
+        watchlist = WATCHLIST
         errors.append(f"supabase_probe: {e}")
-        log.error("SUPABASE PROBE FAILED: %s", e)
+        log.error("SUPABASE PROBE FAILED (using fallback watchlist): %s", e)
 
     # --- Finnhub (finance + per-ticker) ---
     if token:
@@ -154,7 +157,7 @@ def main() -> None:
         except Exception as e:  # noqa: BLE001
             errors.append(f"finnhub_general: {e}")
             log.warning("finnhub general failed: %s", e)
-        for sym in WATCHLIST:
+        for sym in watchlist:
             try:
                 rows += fetch_finnhub_company(token, sym, days)
                 time.sleep(1.1)  # respect free-tier ~60 req/min
