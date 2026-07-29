@@ -21,7 +21,8 @@ Env:
   SUPABASE_URL, SUPABASE_SERVICE_KEY       (required)
   COMPOSIO_API_KEY                         (required — Reddit via Composio)
   COMPOSIO_REDDIT_ACCOUNT_ID               (Composio connected-account id for Reddit)
-  COMPOSIO_BASE_URL   default v3 execute   (⚠️ verify on first Railway run)
+  COMPOSIO_USER_ID    default "default"    (Composio entity id; required by v3 execute)
+  COMPOSIO_BASE_URL   default v3 execute   (backend.composio.dev/api/v3)
   ANTHROPIC_API_KEY                        (optional; tier-3 LLM read skipped if unset)
   SOCIAL_RETENTION_DAYS   default "90"
 
@@ -80,17 +81,21 @@ HAIKU = "claude-haiku-4-5-20251001"   # cheap model for the tier-3 read
 # --------------------------------------------------------------------------- Composio
 
 def _composio_execute(tool_slug: str, arguments: dict) -> dict:
-    """Execute a Composio tool from a headless process (Railway) via the REST API.
+    """Execute a Composio tool from a headless process (Railway) via the REST v3 API.
 
-    ⚠️ VERIFY ON FIRST RAILWAY RUN: the connection is confirmed working through the
-    Composio MCP; this REST endpoint/field shape (v3 execute, `x-api-key`,
-    `connected_account_id`) should be confirmed against Composio's current API on the
-    first run. If it 404s/401s, only THIS function changes — everything downstream parses
-    the Reddit listing the same way. Base URL is overridable via COMPOSIO_BASE_URL.
+    Confirmed contract (Composio v3 `POST /tools/execute/{slug}`, header `x-api-key`):
+    the body needs BOTH `user_id` (the entity identifier — Composio error 1811 requires
+    it alongside a connected account) AND `connected_account_id`, plus `arguments`.
+    `user_id` defaults to "default" (the standard entity); override via COMPOSIO_USER_ID
+    if the connection lives under a different entity. Base URL overridable via
+    COMPOSIO_BASE_URL. On a non-2xx we raise Composio's body verbatim for diagnosis.
     """
     api_key = os.environ["COMPOSIO_API_KEY"]
     base = os.environ.get("COMPOSIO_BASE_URL", "https://backend.composio.dev/api/v3")
-    payload: dict = {"arguments": arguments}
+    payload: dict = {
+        "user_id": os.environ.get("COMPOSIO_USER_ID", "default"),
+        "arguments": arguments,
+    }
     account = os.environ.get("COMPOSIO_REDDIT_ACCOUNT_ID")
     if account:
         payload["connected_account_id"] = account
