@@ -112,6 +112,19 @@ def _composio_execute(tool_slug: str, arguments: dict) -> dict:
     return r.json()
 
 
+def _composio_debug_accounts() -> None:
+    """One-shot diagnostic (Railway only): log the real connected-account ids + entity/user
+    ids Composio knows, so we can wire the exact identifiers. Remove once resolved."""
+    api_key = os.environ["COMPOSIO_API_KEY"]
+    base = os.environ.get("COMPOSIO_BASE_URL", "https://backend.composio.dev/api/v3")
+    try:
+        r = requests.get(f"{base}/connected_accounts",
+                         headers={"x-api-key": api_key}, timeout=HTTP_TIMEOUT)
+        log.info("DEBUG connected_accounts %s: %s", r.status_code, r.text[:2000])
+    except Exception as e:  # noqa: BLE001
+        log.warning("DEBUG connected_accounts probe failed: %s", e)
+
+
 def _children(resp: dict) -> list[dict]:
     """Pull the Reddit listing children out of Composio's response, tolerating the
     variable nesting (`data.children` vs an extra `data.data.children` wrapper)."""
@@ -293,6 +306,7 @@ def main() -> None:
 
     log.info("reddit ingest starting; composio_key=%s subs=%s tickers=%d",
              bool(os.environ.get("COMPOSIO_API_KEY")), SUBREDDITS, len(valid))
+    _composio_debug_accounts()   # TEMP: log real account/entity ids, then remove
 
     buzz_rows: list[dict] = []
     thread_rows: list[dict] = []
