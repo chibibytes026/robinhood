@@ -176,8 +176,8 @@ def _fetch_hot(subreddit: str) -> list[dict]:
     kids = _children(resp)
     if not kids:
         import json as _json
-        log.warning("DEBUG fetch %s: 0 posts parsed; shape=%s",
-                    subreddit, _json.dumps(resp)[:900] if isinstance(resp, dict) else type(resp))
+        log.warning("fetch %s: 0 posts parsed (envelope may have changed); shape=%s",
+                    subreddit, _json.dumps(resp)[:500] if isinstance(resp, dict) else type(resp))
     return kids
 
 
@@ -298,8 +298,8 @@ def _process_subreddit(sub: str, valid: set[str], today: str) -> tuple[list[dict
         except Exception as e:  # noqa: BLE001
             log.warning("comment fetch failed for %s/%s: %s", sub, megathread.get("id"), e)
 
-    log.info("DEBUG sub %s: %d posts, %d megathread-comments, %d tickers mentioned (%s)",
-             sub, len(posts), n_comments, len(mentions), dict(list(mentions.items())[:8]))
+    log.info("%s: %d posts, %d megathread-comments, %d tickers mentioned",
+             sub, len(posts), n_comments, len(mentions))
 
     # Tier 2 — keyword the top 3 posts, attributing sentiment to the tickers each names.
     bull: dict[str, int] = {}
