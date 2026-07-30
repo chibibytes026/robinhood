@@ -92,6 +92,43 @@ Two alternatives, for the record:
 
 ---
 
+## Applying the Oracle's selectivity — four compounding gates + a rarity throttle
+
+**Chosen: Option B.** NANC touches its book most days; left raw that is dozens of tiny signals —
+which *is* The House. Selectivity is what compresses ~106 names × daily churn down to **a handful
+of "strikes" per quarter.** Four gates compound, each reproducing one Oracle trait:
+
+| Gate | Rule | Oracle trait it enforces |
+|---|---|---|
+| **1 — Universe** | `securities.watchlist in ('AI Infra + Power','Mega-Cap Core')`. Excludes `Index Anchor` (VOO/SPY = House turf) and `Water`. | mega-cap tech lane |
+| **2 — Direction** | `move in ('NEW','ADDED')` only. Exits/trims are never a strike. | long, concentrated bull bet |
+| **3 — Conviction** | `move = 'NEW'` **OR** (`Δ shares-per-unit ≥ +20%` **AND** `weight_pct ≥ 1.0%`). | a *real* position, not drift |
+| **4 — Rarity throttle** | rank survivors by conviction score, emit **top-1 per snapshot**, **~10-trading-day per-ticker cooldown**. | rare entries, long silences |
+
+**Why "shares-per-unit" in Gate 3.** It is the only measure immune to *both* failure modes: a name's
+weight moves with price (Gate-2 methodology point below), and its raw share count moves with the
+ETF's create/redeem (AUM doubles → every line's shares double, no decision made). Dividing each
+holding's shares by the fund's total shares outstanding (`fund_shares_out`) neutralizes both, so
+`Δ shares-per-unit` is the clean active-decision signal. (Fallback if `fund_shares_out` is
+unreliable: decompose Δweight into price effect vs. flow effect and keep the flow.)
+
+**Conviction score** — used only to pick *the* strike among Gate-1–3 survivors (transparent, tunable):
+
+```
+score = 0.5·z(Δ shares-per-unit %) + 0.3·z(weight_pct) + 0.2·(move = 'NEW')
+```
+
+**Where each gate runs.** Gates 1–3 are set-based → they live in the `the_oracle_candidates` **view**.
+Gate 4 (top-1 + cooldown) reaches across dates and dedups → it lives in **`map_oracle()` code**, not
+the view.
+
+**The honest limit — selectivity cannot fake timing.** These gates engineer *concentration, rarity,
+and lane* — nothing more. Whether the strikes are actually well-timed is what the **backtest**
+decides; if they are not, the streak classifier turns the Oracle cold and it de-weights itself.
+**Data → State → Voice** holds: selectivity shapes *what* it bets on, never *how confident it sounds.*
+
+---
+
 ## The two non-negotiable methodology points
 
 1. **Signal on Δ *shares held*, never Δ *weight %*.** An ETF's weights move every day purely from
@@ -143,48 +180,63 @@ create table if not exists etf_holdings (
   fund          text not null,                       -- 'NANC' (KRUZ later if wanted)
   ticker        text references securities(ticker),  -- holding symbol (may be null pre-seed)
   as_of_date    date not null,
-  shares        numeric,        -- shares held — THE active-decision field (6dp, no rounding)
-  weight_pct    numeric,        -- context only; do NOT signal on this alone
-  market_value  numeric,
-  ingested_at   timestamptz default now(),
+  shares          numeric,      -- holding's shares held (6dp, no rounding)
+  fund_shares_out numeric,      -- the ETF's total shares outstanding on as_of_date (same for
+                                --   every row of a snapshot). shares/fund_shares_out = shares-per-
+                                --   unit — THE active-decision field, immune to price & create/redeem.
+  weight_pct      numeric,      -- context only; do NOT signal on this alone (moves with price)
+  market_value    numeric,
+  ingested_at     timestamptz default now(),
   unique (fund, ticker, as_of_date)
 );
 
 create index if not exists idx_etf_holdings_fund_date on etf_holdings(fund, as_of_date desc);
 create index if not exists idx_etf_holdings_ticker on etf_holdings(ticker, as_of_date desc);
 
--- Day-over-day (or snapshot-over-snapshot) change in SHARES per holding. This is the diff
--- that becomes an Oracle candidate. NEW = position appeared; EXITED = disappeared.
+-- Snapshot-over-snapshot change in SHARES-PER-UNIT per holding (immune to price & create/redeem).
+-- This is the diff that becomes an Oracle candidate. NEW = position appeared; EXITED = disappeared.
 create or replace view etf_holdings_delta with (security_invoker = true) as
 with snaps as (
   select fund, ticker, as_of_date, shares, weight_pct,
-         lag(shares)     over (partition by fund, ticker order by as_of_date) as prev_shares,
-         lag(as_of_date) over (partition by fund, ticker order by as_of_date) as prev_date
+         shares / nullif(fund_shares_out, 0)                          as spu,   -- shares per unit
+         lag(shares / nullif(fund_shares_out, 0))
+           over (partition by fund, ticker order by as_of_date)       as prev_spu,
+         lag(as_of_date)
+           over (partition by fund, ticker order by as_of_date)       as prev_date
   from etf_holdings
 )
 select
-  fund, ticker, as_of_date, prev_date, shares, prev_shares, weight_pct,
-  (shares - coalesce(prev_shares, 0))                              as d_shares,
+  fund, ticker, as_of_date, prev_date, weight_pct, spu, prev_spu,
+  (spu - coalesce(prev_spu, 0))                                       as d_spu,
+  case when coalesce(prev_spu, 0) = 0 then null
+       else round(100 * (spu - prev_spu) / prev_spu, 2) end           as d_spu_pct,  -- % change
   case
-    when prev_shares is null            then 'NEW'
-    when shares = 0                      then 'EXITED'
-    when shares > prev_shares           then 'ADDED'
-    when shares < prev_shares           then 'TRIMMED'
+    when prev_spu is null or prev_spu = 0   then 'NEW'
+    when spu = 0                            then 'EXITED'
+    when spu > prev_spu                     then 'ADDED'
+    when spu < prev_spu                     then 'TRIMMED'
     else 'HELD'
-  end                                                              as move
+  end                                                                 as move
 from snaps;
 
--- The Oracle candidate board: only LARGE, high-conviction shifts in mega-cap tech names.
--- Thresholds are placeholders — see Open decisions. Keeps the Oracle concentrated & rare.
+-- Gates 1-3 of the Oracle's selectivity (see "Applying the Oracle's selectivity"). The rarity
+-- throttle (Gate 4: top-1 per snapshot + per-ticker cooldown) is applied later in map_oracle(),
+-- not here. Thresholds are the proposed starting values — tune per Open decision #3.
 create or replace view the_oracle_candidates with (security_invoker = true) as
-select d.*
+select
+  d.*,
+  -- conviction score (z-scores computed in map_oracle over the day's survivors; this is the
+  -- raw material). NEW gets the structural bump there.
+  d.weight_pct as _weight_ctx
 from etf_holdings_delta d
 join securities s on s.ticker = d.ticker
 where d.fund = 'NANC'
-  and d.move in ('NEW', 'ADDED')                 -- entries only; exits are a separate signal
-  and d.weight_pct >= 1.0                         -- ⚠️ placeholder: "meaningful" size only
-  and abs(d.d_shares) > 0
-  -- and s.sector in ('Technology', ...)          -- ⚠️ mega-cap tech filter, TBD via securities
+  and s.watchlist in ('AI Infra + Power', 'Mega-Cap Core')      -- Gate 1: mega-cap tech lane
+  and d.move in ('NEW', 'ADDED')                                -- Gate 2: long striker only
+  and (                                                          -- Gate 3: real accumulation
+        d.move = 'NEW'
+        or (d.d_spu_pct >= 20 and d.weight_pct >= 1.0)
+      )
 order by d.as_of_date desc, d.weight_pct desc;
 ```
 
@@ -194,10 +246,12 @@ The Oracle rejoins the standard path with **no new simulator work**:
 
 1. `ingest/etf_holdings.py` (new) — daily snapshot into `etf_holdings` (Finnhub or Composio),
    writes an `ingest_runs` audit row like every other feed.
-2. `ingest/map_personas.py` — add a `map_oracle()` that reads `the_oracle_candidates` and emits one
-   `persona_trades` row per qualifying shift: `persona='the_oracle'`, `side='buy'`,
-   `trade_date = as_of_date` (⚠️ this is the *disclosure/rebalance* date, not the real trade date —
-   `amount_is_est=true`, `disclosed_date=as_of_date`). Same delete-then-insert rebuild.
+2. `ingest/map_personas.py` — add a `map_oracle()` that reads `the_oracle_candidates` (Gates 1-3),
+   **applies Gate 4** (z-score the survivors, add the NEW bump, keep **top-1 per snapshot**, drop any
+   ticker struck within the **10-trading-day cooldown**), then emits one `persona_trades` row per
+   surviving strike: `persona='the_oracle'`, `side='buy'`, `trade_date = as_of_date` (⚠️ the
+   *disclosure/rebalance* date, not the real trade date — `amount_is_est=true`,
+   `disclosed_date=as_of_date`). Same delete-then-insert rebuild.
 3. `sim/backtest.py` → `sim/streak.py` → `persona_performance` — unchanged. The Oracle finally
    earns a **real, backtested** track record on the underlying equity moves.
 4. Voice reads state from `persona_performance` as always. **Data → State → Voice** intact.
@@ -227,11 +281,14 @@ The Oracle rejoins the standard path with **no new simulator work**:
    (full reposition) vs C (new persona, leave Oracle alone). Everything below assumes B.
 2. **Feed:** confirm Finnhub `/etf/holdings` tier on Railway; if premium, accept Composio-proxy
    fallback (and find the canonical issuer holdings URL).
-3. **"Strike" thresholds:** what makes a NANC shift big enough to be an Oracle candidate —
-   min weight, min Δshares (% of prior), NEW-only vs NEW+ADDED. Ties into Open Decision #5
-   (streak thresholds) in `CLAUDE.md`.
-4. **Universe filter:** how to express "mega-cap tech only" — a `securities.sector` gate, a market-
-   cap floor, or an explicit allowlist. Do we ever let a non-tech mega-cap through?
+3. **"Strike" thresholds (starting values proposed, tune before trusting):** Gate 3 add =
+   `Δ shares-per-unit ≥ +20%` & `weight_pct ≥ 1.0%`; Gate 4 = top-1/snapshot + 10-trading-day
+   cooldown; conviction weights `0.5/0.3/0.2`. Calibrate so the Oracle fires ~a handful of
+   strikes/quarter (its "rare" identity). Ties into Open Decision #5 (streak thresholds) in `CLAUDE.md`.
+4. **Universe filter:** proposed as the `securities.watchlist` tags (`AI Infra + Power` +
+   `Mega-Cap Core`), since `securities` has no market-cap column. Confirm: (a) is watchlist the right
+   gate, or add a `sector` set to catch un-watchlisted NANC names (which then need seeding into
+   `securities` + `price_history`)? (b) ever let a non-tech mega-cap through?
 5. **Exits:** treat `EXITED`/`TRIMMED` as their own bearish signal, or ignore (Oracle is long-only)?
 6. **KRUZ:** ignore the Republican sibling, or ingest both and keep NANC-only for the Oracle?
 ```
