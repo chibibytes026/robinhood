@@ -78,12 +78,15 @@ layers ahead of the simulator:
 ## Phase 2 — Accounts & keys (free tier only)
 
 - [x] Finnhub account → API key → Railway service env (`FINNHUB_API_KEY`)
-- [ ] SEC EDGAR: no key, but set a descriptive `User-Agent` (they block generic ones)
+- [x] SEC EDGAR: no key, descriptive `User-Agent` set (`SEC_USER_AGENT`) — proven live: the
+      `architect-13f` cron pulls 13F from EDGAR without a 403. (EDGAR = The Architect's 13F feed;
+      it is NOT the congressional source — that's the House/Senate clerk, still blocked/premium.)
 - [x] Railway account, project created — `serene-friendship`, nightly `ingest.daily` cron
 - [x] GitHub → Railway auto-deploy connected (GitHub App installed + environment connected to
       branch `claude/reference-files-review-nb9y1i`). Composio is the fallback control path
       when the native Railway MCP drops.
-- [ ] Anthropic API key (for report generation) → `.env`
+- [x] Anthropic API key set in Railway — already powering The Shut-In's tier-3 LLM reads
+      (`api.anthropic.com` 200s in the logs). Report generation itself is still Phase 8.
 
 > Skip paid APIs entirely for now. Revisit FMP (~$19/mo, **includes commercial rights**)
 > only once something here is making money. Quiver's $75 tier is breadth you don't need yet.
