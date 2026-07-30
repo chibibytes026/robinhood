@@ -116,14 +116,20 @@ Start with **insider Form 4** — highest signal, lowest noise.
 - [x] ⭐ `ingest/prices.py` → `price_history` — DONE. Split-adjusted daily OHLCV + real dividends
       via Yahoo (Finnhub `stock candles` are premium on the free tier); daily Railway cron; the
       ticker universe is read from `securities`. (was `finnhub_prices.py`)
-- [~] Backfill depth: currently a **3-month rolling window** (matches news retention), NOT 2 years.
-      ⚠️ backtesting older disclosed trades (insider P-buys go back to 2025-09) needs deeper
-      history — revisit `PRICE_RETENTION_DAYS` before the sim runs.
+- [x] Backfill depth **deepened to 420 days** (`PRICE_LOOKBACK_DAYS` / `PRICE_RETENTION_DAYS`,
+      was 92) so 13F trades (quarterly, ~45-day lag, 2 quarters kept) span report_period ..
+      report_period + hold. Next prices run backfills the deeper window.
 - [ ] `ingest/congress.py` → `congress_trades` — ⛔ blocked (congressional feed is premium)
 - [x] `ingest/architect_13f.py` → `institutional_holdings` — DONE. By CUSIP+issuer, put/call legs
       separate; manifest + coverage/moves views. (was `edgar_13f.py`)
-- [ ] `ingest/map_personas.py` → flatten into `persona_trades` — needs a CUSIP→ticker resolve for
-      the 13F persona (OpenFIGI) before it can feed the sim
+- [x] `ingest/cusip_resolve.py` → **CUSIP→ticker via OpenFIGI** (free, no key). Resolves 13F
+      CUSIPs, expands `securities` (tag `🧠 Architect 13F`) so prices.py backfills them, and
+      stamps `institutional_holdings.ticker`. Wired into the `architect-13f` cron. The
+      `institutional_moves` view now exposes `ticker`.
+- [x] `ingest/map_personas.py` → flatten into `persona_trades` — DONE. Insider P-buys +
+      Architect 13F moves (option leg → directional side: a PUT opened = bearish = `sell`).
+      Full rebuild (delete+insert), runs after cusip_resolve in the `architect-13f` cron.
+      Congress personas skipped (feed blocked).
 - [x] **Universe is theme-tagged:** `securities.watchlist` mirrors the Robinhood lists (Water ·
       AI Infra + Power · Mega-Cap Core · Index Anchor); news/insider/prices all read the universe
       from `securities`, so new themes propagate automatically. 💧 Water added.

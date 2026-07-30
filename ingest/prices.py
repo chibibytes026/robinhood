@@ -142,8 +142,10 @@ def main() -> None:
     started = time.time()
     client = get_client()
     token = os.environ.get("FINNHUB_API_KEY")
-    lookback = int(os.environ.get("PRICE_LOOKBACK_DAYS", "92"))
-    retention = int(os.environ.get("PRICE_RETENTION_DAYS", "92"))
+    # Deepened from 92 -> 420 days: backtesting 13F trades (quarterly, ~45-day lag,
+    # kept 2 quarters back) needs prices spanning report_period .. report_period + hold.
+    lookback = int(os.environ.get("PRICE_LOOKBACK_DAYS", "420"))
+    retention = int(os.environ.get("PRICE_RETENTION_DAYS", "420"))
     p2 = int(time.time())
     p1 = p2 - lookback * 86400
 

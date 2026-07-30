@@ -206,6 +206,7 @@ select
   coalesce(cur.cik, prv.cik)                              as cik,
   coalesce(cur.fund_name, prv.fund_name)                 as fund_name,
   coalesce(cur.cusip, prv.cusip)                          as cusip,
+  coalesce(cur.ticker, prv.ticker)                        as ticker,   -- resolved by ingest/cusip_resolve.py (OpenFIGI)
   coalesce(cur.issuer, prv.issuer)                        as issuer,
   coalesce(cur.put_call, prv.put_call)                    as put_call,
   cur.report_period                                       as cur_period,

@@ -224,6 +224,23 @@ def main() -> None:
         errors.append(f"coverage_check: {e}")
         log.warning("coverage check failed: %s", e)
 
+    # Resolve any new CUSIPs -> tickers (OpenFIGI) and expand `securities` so prices.py
+    # backfills them, then rebuild persona_trades. Both guarded — a downstream failure
+    # must not fail the 13F ingest itself. (Both are also standalone-runnable modules.)
+    try:
+        from ingest import cusip_resolve
+        n = cusip_resolve.resolve(client)
+        log.info("architect_13f: cusip_resolve mapped %d new ticker(s)", n)
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"cusip_resolve: {e}")
+        log.warning("cusip_resolve failed: %s", e)
+    try:
+        from ingest import map_personas
+        map_personas.main()
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"map_personas: {e}")
+        log.warning("map_personas failed: %s", e)
+
     status = "ok" if (total and not errors) else ("partial" if total else "failed")
     duration_ms = int((time.time() - started) * 1000)
     try:
