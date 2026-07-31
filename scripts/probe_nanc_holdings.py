@@ -44,6 +44,11 @@ UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 SEC_UA = "robinhood-personas research (contact: jj@dulcenochemedia.com)"
 
 FUND_PAGE = "https://subversiveetfs.com/nanc/"
+# Discovered by the issuer-page scrape below: the Tidal daily full-holdings CSV.
+TIDAL_CSV = "https://subversiveetfs.com/wp-content/uploads/data/TidalFG_Holdings_NANC.csv"
+# Names in the Oracle's AI Infra + Power sleeve — confirm the full book covers them
+# (this was the open trade-off vs Yahoo's top-10-only view).
+POWER_SLEEVE = {"VST", "BE", "CRWV", "CEG", "NVDA"}
 
 
 def _get(url: str, headers: dict | None = None, cookie: str | None = None):
@@ -204,10 +209,50 @@ def probe_yahoo():
         print("       yfinance.Ticker('NANC').funds_data.top_holdings")
 
 
+def dump_tidal_csv():
+    """Fetch the discovered Tidal daily CSV and print the WHOLE book, parsed.
+
+    This is the prize source: full holdings, real share counts, daily. Confirm it
+    carries the AI Infra + Power sleeve (the coverage the top-10 Yahoo view misses).
+    """
+    print("\n" + "=" * 70 + "\n0) TIDAL DAILY FULL-HOLDINGS CSV (the prize)\n" + "=" * 70)
+    s, c, b, e = _get(TIDAL_CSV, headers={"Referer": FUND_PAGE})
+    if e or s != 200 or not b:
+        print(f"  url: {TIDAL_CSV}\n  status: {s}  err: {e}  (not reachable from here)")
+        return
+    text = b.decode("utf-8", "replace")
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    header = lines[0].split(",")
+    print(f"  url    : {TIDAL_CSV}")
+    print(f"  as_of  : {lines[1].split(',')[0] if len(lines) > 1 else '?'}")
+    print(f"  columns: {header}")
+    print(f"  rows   : {len(lines) - 1} holdings")
+    try:
+        ti, si, wi = header.index("StockTicker"), header.index("Shares"), header.index("Weightings")
+    except ValueError:
+        print("  (unexpected header layout; raw first rows:)")
+        for ln in lines[:6]:
+            print("   ", ln)
+        return
+    print("  full book (ticker / shares / weight):")
+    seen = set()
+    for ln in lines[1:]:
+        col = ln.split(",")
+        if len(col) <= max(ti, si, wi):
+            continue
+        tk = col[ti].strip()
+        seen.add(tk)
+        print(f"    {tk:6} {col[si].strip():>12}  {col[wi].strip()}")
+    hit = sorted(POWER_SLEEVE & seen)
+    miss = sorted(POWER_SLEEVE - seen)
+    print(f"  power-sleeve coverage: present={hit}  absent={miss}")
+
+
 def main():
     print("NANC holdings probe — read-only, headless, no browser.")
     print("If every source shows a CONNECT/403 error, you're running inside a blocked")
     print("egress (e.g. the agent session). Re-run on Railway or locally.\n")
+    dump_tidal_csv()
     probe_issuer()
     probe_edgar()
     probe_yahoo()
