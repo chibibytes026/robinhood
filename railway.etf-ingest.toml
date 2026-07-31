@@ -1,0 +1,15 @@
+# One-off Railway config to run the FIRST live NANC-holdings ingest.
+#
+# Runs `ingest.etf_holdings` once (baseline snapshot) from Railway's open egress. Point a
+# temporary service's "Config as Code" path here, set SUPABASE_URL + SUPABASE_SERVICE_KEY,
+# deploy once, verify rows in etf_holdings, then delete the service. Not wired to any cron.
+#
+# The recurring feed does NOT use this file — it runs inside `ingest.daily` on the normal
+# daily cron. This is purely to land day-0 data now.
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "python -m ingest.etf_holdings"
+restartPolicyType = "NEVER"
