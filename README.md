@@ -20,6 +20,8 @@ It exists to make a human a sharper decision-maker. **It does not trade.**
 - **[TODO.md](./TODO.md)** — the phased build sequence.
 - **[schema.sql](./schema.sql)** — the Supabase schema (canonical; matches the live DB).
 - **[personas/](./personas/)** — the hand-authored voice bibles.
+- **[docs/sensei-terminal-plan.md](./docs/sensei-terminal-plan.md)** — the UI plan for the
+  interactive layer (Sensei Terminal). Planning only, no app code yet.
 
 ## The personas
 
@@ -113,6 +115,24 @@ Also free on Finnhub and worth pulling as *context* (not persona state): insider
 > (`stock candles` → `price_history`). It's a big build, deliberately deferred until all
 > personas and their data feeds exist. Nothing about the backtest → state → voice chain works
 > until this lands, so it's the single biggest item on the TODO.
+
+## Interactive layer — the Sensei Terminal
+
+The read side (where **you** query the personas and act) is the **Sensei Terminal**: a **local
+Electron desktop app** powered by the **Claude Agent SDK**. It is a **council cockpit**, not a
+chat REPL — you press **CONSULT THE PARTY**, every live persona renders its in-voice stance at
+once, and any proposed **long-equity** order surfaces with **APPROVE / DECLINE** you seal by hand.
+
+- **Local, not online** — brokerage credentials stay on your machine; there is no public URL to
+  gate. This is the "user present" interactive layer the constraints already assume.
+- **Council cockpit, not a REPL** — the earlier Zork text-REPL plan is superseded by the mocked
+  UI (`Sensei Terminal.dc.html`).
+- **Guardrails are in the UI** — `HUMAN APPROVAL REQUIRED`, and every order card carries
+  `agentic-ringfence · LONG EQUITY ONLY · NO OPTIONS · NO UNATTENDED FILLS`.
+
+Full design→schema map, architecture, and phased build: **[docs/sensei-terminal-plan.md](./docs/sensei-terminal-plan.md)**.
+Status: **planned, not built** — ships in phases (roster + Herald stances first; execution last;
+the VS-SPY performance panel stays paper until the simulator lands).
 
 ## Layout
 

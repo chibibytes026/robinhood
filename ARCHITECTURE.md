@@ -96,21 +96,35 @@ voice bible, calls the Anthropic API, writes an in-voice markdown report into
 
 The report is the backtest, narrated. Numbers first, voice second.
 
-### 6. Retrieval / query (Claude Desktop)
-When you ask *"@the-oracle, what's the play this morning?"* Claude pulls:
+### 6. Interactive layer (the Sensei Terminal — local app)
+The read side is the **Sensei Terminal**: a **local Electron desktop app** powered by the
+**Claude Agent SDK**. It is a **council cockpit**, not a chat REPL — you press **CONSULT THE
+PARTY** and every live persona renders its stance at once; proposed **long-equity** orders
+surface with **APPROVE / DECLINE** you seal by hand. (This supersedes the earlier "Zork in a
+terminal" REPL. Full plan: [`docs/sensei-terminal-plan.md`](./docs/sensei-terminal-plan.md).)
+
+Per persona, a consult round pulls:
 
 ```
-personas/the_oracle/persona.md      ← voice bible (repo)
-persona_performance (latest)        ← current streak state
-persona_reports (latest monthly)    ← recent narrative
-persona_reports (latest quarterly)  ← longer arc
+personas/<slug>/persona.md          ← voice bible (repo)
+persona_performance (latest)        ← current streak state  → register + conviction
+persona_reports (latest monthly/qtr)← recent narrative arc (optional)
 persona_trades (last N)             ← freshest moves
 watchlist_signals (top scored)      ← what's flagged now
+that persona's latest feed rows     ← market_news / insider_buys / the_shutin_board / 13F moves
 Robinhood MCP: quotes + positions    ← live market + your actual book
 ```
 
 ...and answers in character: what this style is eyeing, what to watch, what it'd flag as a
-mistake in your current book, what it'd liquidate.
+mistake in your current book, what it'd liquidate — with any actionable buy surfaced as a sized,
+human-approved order card.
+
+**Multi-agent:** the retrieval + narration is **not** one monolithic agent. The Agent SDK runs a
+team of scoped **subagents** — an orchestrator plus per-domain data readers and per-persona voice
+agents, each allowlisted to only the MCP tools it needs. See the plan doc's "Multi-agent design"
+section. (Note: this uses the SDK's *subagent/orchestrator* primitives, **not** Claude Code's
+experimental terminal "agent teams" feature, which orchestrates interactive CLI sessions, not an
+embedded app backend.)
 
 ---
 
@@ -137,13 +151,18 @@ GitHub  ──push──▶  Railway
                      └─ cron: reports       (monthly / quarterly)
                               │
                               ▼
-                          Supabase  ◀──MCP──  Claude Desktop  ◀──  you
+                          Supabase  ◀──MCP──  Sensei Terminal  ◀──  you
+                                              (local Electron app,
+                                               Claude Agent SDK + subagents)
                                                     │
-                                            Robinhood MCP (read + watchlists)
+                                            Robinhood MCP (read + watchlists
+                                            + human-approved equity execution)
 ```
 
-**No Chrome anywhere.** The pipeline is headless HTTP. The interactive layer runs in the
-Claude desktop app, which hosts the MCP connectors natively.
+**No Chrome anywhere.** The pipeline is headless HTTP. The interactive layer is a **local
+Electron app** that embeds the Claude Agent SDK and hosts the MCP connectors — it uses its own
+webview, not the user's (saturated) Chrome. Execution is human-approved, per-trade-confirmed, and
+ring-fenced to the `agentic_allowed` account; nothing trades unattended.
 
 ---
 
