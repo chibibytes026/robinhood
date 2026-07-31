@@ -266,14 +266,16 @@ create index if not exists idx_ptrades_persona_date on persona_trades(persona, t
 -- ------------------------------------------------------------
 -- LAYER 4: SIMULATION
 --
--- The sim is a HEADLESS terminal program — no GUI, no dashboard, no visualization.
--- The interactive layer runs like *Zork in a terminal*: a text REPL where you type
--- "@<persona> <question>" and it answers in-character.
+-- The sim is a HEADLESS pipeline job — no GUI, no dashboard, no visualization. It just writes
+-- `backtests` + `persona_performance`; the read/interactive side consumes those.
 --   sim/backtest.py  — replays each persona's disclosed trades against price_history,
 --                      writes one row per trade to `backtests`.
 --   sim/streak.py    — classifies those into a state, writes `persona_performance`.
---   sim/terminal.py  — the Zork REPL; reads persona_performance + backtests +
---                      persona_calls + the repo voice bible, narrates. Data -> state -> voice.
+-- The INTERACTIVE layer is the Sensei Terminal — a local Electron app (Claude Agent SDK +
+-- scoped subagents) rendering a COUNCIL COCKPIT: press "Consult the Party", every live persona
+-- narrates its stance from persona_performance + backtests + persona_calls + feeds + the repo
+-- voice bible, and proposed long-equity orders are human-approved inline. Data -> state -> voice.
+-- (Supersedes the earlier "Zork text REPL / sim/terminal.py" plan; see docs/sensei-terminal-plan.md.)
 -- Locked knobs: price_basis = next_open · fixed $/trade (selection, not sizing) ·
 --   hold_days in TRADING days (21 / 63). See TODO.md "Open decisions" for streak thresholds.
 -- ------------------------------------------------------------

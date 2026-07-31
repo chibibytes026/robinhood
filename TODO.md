@@ -50,6 +50,9 @@ layers ahead of the simulator:
   (`active=false`) until the simulator scores buzz→returns. Composio gotcha logged: the REST v3
   API needs `user_id` + the real `ca_` account id (not the MCP's word alias), and wraps results
   as `data.posts_list` (not `data.children`).
+- **UI planned (2026-07-31).** The interactive layer got a design + plan: the **Sensei Terminal**,
+  a **local Electron app** (Claude Agent SDK) rendering a **council cockpit** — supersedes the
+  Zork REPL. See Phase 10 and `docs/sensei-terminal-plan.md`. Planning only; no app code yet.
 
 ---
 
@@ -202,17 +205,36 @@ Start with **insider Form 4** — highest signal, lowest noise.
 
 ---
 
-## Phase 10 — Interactive layer (Zork-style terminal)
+## Phase 10 — Interactive layer (Sensei Terminal — local app)
 
-> **Model:** the sim runs like **Zork in a terminal** — a text REPL, no GUI, no wrapper, no
-> visualization. You type at a persona; it reads state from Supabase and answers in prose.
-> The sim is headless (writes `backtests` / `persona_performance`); this is the read side.
+> **Model UPDATED (2026-07-31):** the interactive layer is the **Sensei Terminal** — a **local
+> Electron desktop app** powered by the **Claude Agent SDK**, not a stdin REPL. The Zork
+> text-REPL idea is **superseded**. Full plan + design→schema map: **`docs/sensei-terminal-plan.md`**.
+>
+> **Why the change:** the user mocked up a UI in Claude Design (`Sensei Terminal.dc.html`). Two
+> decisions fell out of planning: (1) **local, not online** — deletes the public attack surface,
+> keeps brokerage creds on the user's machine (this *is* the "user present" interactive layer);
+> (2) the design is a **council cockpit**, not a Q&A REPL — press **CONSULT THE PARTY**, every live
+> persona renders its stance at once, and you **APPROVE / DECLINE** proposed orders inline. Still
+> Data → State → Voice. Electron uses an embedded webview, **not the user's saturated Chrome**.
 
-- [ ] `sim/terminal.py` — text REPL: `@<persona> <question>` → pull state → answer in-voice
-- [ ] Retrieval per turn: voice bible + `persona_performance` (streak) + recent `backtests` /
-      `persona_trades` + live quotes (Robinhood MCP) — no dashboards/reports required
-- [ ] Confirm a cold persona actually de-weights its own advice (state drives voice)
-- [ ] ~~Install Claude Desktop, move off Chrome~~ — **dropped**: it's a terminal CLI, not a GUI
+- [ ] ~~`sim/terminal.py` — stdin text REPL~~ — **dropped**, replaced by the Sensei Terminal app
+- [ ] **Electron shell + React port** of the three-column cockpit (`306 / 1fr / 268`, JetBrains
+      Mono, paper `#F5F2EB` / crimson `#C41E3A`). Recreate visual output; do **not** port the
+      Claude Design `support.js` / `<x-dc>` shim.
+- [ ] **Multi-agent, not monolithic:** an orchestrator + scoped **subagents** (the SDK `agents`
+      option) — parallel data-readers (Supabase read only), per-persona voice agents (`tools: []`,
+      speak only from handed-in state/evidence), and an executor spawned only on APPROVE. Agent
+      teams are CLI-only/experimental; the app uses SDK **subagents**. See plan doc "Multi-agent design".
+- [ ] **Agent SDK CONSULT round:** per active persona, retrieve voice bible + `persona_performance`
+      + latest feed rows (+ live quote) → structured `{register, conviction, stance, evidence, call?}`.
+- [ ] **Guarded APPROVE flow (execution last):** `review_equity_order` → `place_equity_order` in
+      the `agentic_allowed` ringfence → log `persona_calls.linked_order`. Register **equity +
+      watchlist tools only**; options/exercise tools NOT in the toolset. No cron/background path.
+- [ ] Confirm a cold persona actually de-weights (lower CONVICTION bar + self-discounting prose)
+- [ ] Right rail: FEEDS (`ingest_runs`), STOCK PICKS (`watchlist_signals`), SESSION LEDGER
+      (session-local), VS SPY (`backtests` — **paper/empty until the simulator lands**)
+- [ ] ~~Install Claude Desktop, move off Chrome~~ — **dropped**: it's a local Electron app now
 
 ---
 
