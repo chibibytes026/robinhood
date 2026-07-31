@@ -226,6 +226,74 @@ from cur full outer join prv
   on cur.cik = prv.cik and cur.cusip = prv.cusip and cur.put_call = prv.put_call;
 
 
+-- ETF holdings — The Oracle's feed. Daily full-book snapshot of NANC (the ETF that
+-- packages Democratic congressional disclosures), pulled from the fund administrator's
+-- daily CSV by ingest/etf_holdings.py. One row per (fund, holding, day). ~101 rows/day.
+-- Columns mirror the CSV. NOTE: `ticker` has NO securities FK — this is the full external
+-- book (names we don't track included); the candidate view below joins to securities to
+-- filter to the Oracle's universe. Ticker is normalized on ingest (e.g. GOOG -> GOOGL) so
+-- it lines up with securities/price_history. Longer retention than news (a signal series).
+create table if not exists etf_holdings (
+  id              bigint generated always as identity primary key,
+  fund            text not null,                 -- 'NANC' (GOP/KRUZ later if wanted)
+  ticker          text,                          -- CSV StockTicker, normalized; no FK (see note)
+  cusip           text,                          -- CSV CUSIP (bonus; no resolve needed)
+  as_of_date      date not null,                 -- CSV Date
+  shares          numeric,                       -- CSV Shares — THE active-decision field (6dp)
+  fund_shares_out numeric,                        -- CSV SharesOutstanding; shares/fund_shares_out =
+                                                 --   shares-per-unit, immune to price + create/redeem
+  weight_pct      numeric,                       -- CSV Weightings (context; never signal on alone)
+  market_value    numeric,                       -- CSV MarketValue
+  ingested_at     timestamptz default now(),
+  unique (fund, ticker, as_of_date)
+);
+
+create index if not exists idx_etf_holdings_fund_date on etf_holdings(fund, as_of_date desc);
+create index if not exists idx_etf_holdings_ticker on etf_holdings(ticker, as_of_date desc);
+
+-- Snapshot-over-snapshot change in SHARES-PER-UNIT (immune to price & create/redeem). This is
+-- the diff that becomes an Oracle candidate. NEW = position appeared; a full EXIT drops out of
+-- the CSV entirely (no row), which the long-only Oracle ignores anyway. security_invoker → RLS.
+create or replace view etf_holdings_delta with (security_invoker = true) as
+with snaps as (
+  select fund, ticker, as_of_date, weight_pct, market_value, shares,
+         shares / nullif(fund_shares_out, 0)                                    as spu,
+         lag(shares / nullif(fund_shares_out, 0))
+           over (partition by fund, ticker order by as_of_date)                 as prev_spu,
+         lag(as_of_date)
+           over (partition by fund, ticker order by as_of_date)                 as prev_date
+  from etf_holdings
+)
+select
+  fund, ticker, as_of_date, prev_date, weight_pct, market_value, shares, spu, prev_spu,
+  (spu - coalesce(prev_spu, 0))                                                 as d_spu,
+  case when coalesce(prev_spu, 0) = 0 then null
+       else round(100 * (spu - prev_spu) / prev_spu, 2) end                     as d_spu_pct,
+  case
+    when prev_spu is null or prev_spu = 0   then 'NEW'
+    when spu = 0                            then 'EXITED'
+    when spu > prev_spu                     then 'ADDED'
+    when spu < prev_spu                     then 'TRIMMED'
+    else 'HELD'
+  end                                                                           as move
+from snaps;
+
+-- The Oracle's selectivity Gates 1-3 (see personas/the_oracle/nanc-restructure.md). Gate 4
+-- (rank by conviction, top-1/snapshot + 10-trading-day cooldown) is applied in map_personas.
+-- Gate 1: mega-cap-tech lane (watchlist join). Gate 2: long striker (NEW/ADDED). Gate 3: real
+-- accumulation (NEW, or >=20% shares-per-unit rise landing at >=1% weight). Thresholds are the
+-- proposed starting values — tune before trusting (nanc-restructure.md, open decision #3).
+create or replace view the_oracle_candidates with (security_invoker = true) as
+select d.fund, d.ticker, d.as_of_date, d.move, d.d_spu_pct, d.weight_pct, d.market_value, d.shares
+from etf_holdings_delta d
+join securities s on s.ticker = d.ticker
+where d.fund = 'NANC'
+  and s.watchlist in ('AI Infra + Power', 'Mega-Cap Core')      -- Gate 1
+  and d.move in ('NEW', 'ADDED')                                -- Gate 2
+  and (d.move = 'NEW' or (d.d_spu_pct >= 20 and d.weight_pct >= 1.0))  -- Gate 3
+order by d.as_of_date desc, d.weight_pct desc;
+
+
 -- ------------------------------------------------------------
 -- LAYER 3: PERSONAS
 -- ------------------------------------------------------------

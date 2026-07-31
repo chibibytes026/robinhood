@@ -1,10 +1,13 @@
 # The Oracle — NANC restructure proposal
 
-**Status: proposal, NOT applied.** Nothing here is in `schema.sql`, the live Supabase
-project, or `persona.md` yet. This is a design sketch to review before any ingestion is
-written or the voice bible is edited. Conventions match the existing schema (snake_case,
-`securities` FK, `timestamptz`, `security_invoker` views, 3-month-style retention where it
-fits) and the `the_shutin/data-model.md` proposal format.
+**Status: BUILT (Option B), pending first live run + threshold tuning.** Applied:
+`etf_holdings` table + `etf_holdings_delta` / `the_oracle_candidates` views (in `schema.sql`
+and live in Supabase), `ingest/etf_holdings.py` (NANC daily CSV → `etf_holdings`, wired into
+`ingest/daily.py`), `map_oracle()` in `ingest/map_personas.py` (gate 4 + cold-start skip),
+`personas/the_oracle/persona.md` rewritten, and the `the_oracle` persona row repointed to
+`source_type='etf', source_key='NANC'`. **Not yet:** a first Railway ingest to land real data,
+the ≥2 daily snapshots a strike needs, and calibration of the placeholder thresholds
+(open decision #3). This doc is now the design-of-record for what was built.
 
 ---
 
