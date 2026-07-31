@@ -178,14 +178,22 @@ each with a mitigation:
 
 **Phase 2 — the Tidal full-holdings file (restores the power sleeve + sub-top-10 NEWs).**
 NANC's advisor is **Tidal Investments**; Tidal ETFs publish a full daily holdings file *with real
-share counts* (so no reconstruction needed — `shares`/`fund_shares_out` fill directly). ⚠️ locate
-the canonical Tidal fund-services URL and test from Railway — it may serve directly (like
-Yahoo/Finnhub) or need the Composio proxy (the Shut-In's `COMPOSIO_API_KEY` pattern). Upgrade path,
-not a blocker.
+share counts* (so no reconstruction needed — `shares`/`fund_shares_out` fill directly).
+**Probe findings so far:** the only *confirmed public* Tidal file is a **quarterly holdings PDF**
+(`.../TidalETF_Services.40ZZ.NANC_QxHoldings_YYYYMMDD.pdf`) — a PDF, and quarterly, so **not** the
+daily machine-readable feed we want. No daily CSV/JSON endpoint is publicly documented; if one
+exists it's an undocumented source behind the fund page. `scripts/probe_nanc_holdings.py` (added)
+hunts for it **headlessly** (fetch the page HTML, regex for a data-source URL — never a browser,
+per the hard constraint) and probes candidates. ⚠️ **It cannot run from the agent session** — that
+egress 403s every external host at the CONNECT layer (an org policy denial we don't route around);
+**run it on Railway** (or locally). If no daily endpoint surfaces, Phase 2 falls back to N-PORT
+below, or a Composio-proxied fetch (Shut-In's `COMPOSIO_API_KEY` pattern).
 
-**Historical backfill / validation — SEC N-PORT.** EDGAR is already proven-reachable (Form 4 / 13F).
-N-PORT gives full historical holdings, but quarterly and ~60-day lagged — useless as the live
-signal, good for backtesting the *style* over past quarters.
+**Historical backfill / validation — SEC N-PORT.** EDGAR is already proven-reachable from Railway
+(Form 4 / 13F). N-PORT is the **authoritative full book *with* share counts** — no reconstruction —
+but quarterly and ~60-day lagged: useless as the live signal, ideal for backtesting the *style*
+over past quarters and for validating the Yahoo-reconstructed share counts. The probe script checks
+NANC's latest NPORT-P too.
 
 **All paths:** pull once per trading day, diff against the prior snapshot. The diff is the signal.
 
