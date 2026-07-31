@@ -148,43 +148,65 @@ decides; if they are not, the streak classifier turns the Oracle cold and it de-
 
 ---
 
-## Data access — the 403 wall applies here too
+## Data access — Yahoo top-10 for v1, Tidal full-file for phase 2
 
-The issuer/aggregator holdings pages (`subversiveetfs.com`, `stockanalysis.com`, etc.) **403 from
-the datacenter IP** — the same block that killed GDELT/Reddit-direct and that 403s Finnhub from
-the agent session. Two headless-friendly paths, in priority order:
+Finnhub `/etf/holdings` is **premium — confirmed not in our tier**, so it's out. The issuer /
+aggregator pages (`subversiveetfs.com`, `stockanalysis.com`) **403 the datacenter IP**. What *is*
+proven reachable headless is **Yahoo**: `ingest/prices.py` already pulls `query1.finance.yahoo.com`
+from Railway with a browser UA. The feed rides that existing, working path.
 
-1. **Finnhub `/etf/holdings`** (`GET /etf/holdings?symbol=NANC`). Finnhub is already wired
-   (`FINNHUB_API_KEY`) and reachable **from Railway**. ⚠️ Almost certainly a **premium** endpoint
-   — verify on the first Railway call (premium returns `403 / {"error": "...premium..."}`), exactly
-   like the doc's other "verify on first call" items. If free/affordable, this is by far the
-   cleanest fit — same client, same cron, clean tickers.
-2. **Composio-proxied fetch of the issuer's daily holdings file** — the same pattern the Shut-In
-   uses for Reddit (`COMPOSIO_API_KEY`, Composio's servers make the request, Railway gets JSON).
-   Fallback if Finnhub's holdings endpoint is paywalled. ⚠️ requires locating the canonical daily
-   holdings URL (issuer CSV via fund administrator) and confirming it serves through the proxy.
+**v1 — Yahoo `topHoldings` (free, proven, available now).**
+`GET query1.finance.yahoo.com/v10/finance/quoteSummary/NANC?modules=topHoldings` →
+`result[0].topHoldings.holdings[]` = `{symbol, holdingName, holdingPercent}`. Two hard limits,
+each with a mitigation:
 
-Either way: **pull once per trading day, diff against yesterday's snapshot.** The diff is the
-entire signal.
+- **Top ~10 only.** This covers the Oracle's **Mega-Cap Core** sleeve almost exactly — NANC's
+  top-10 *is* NVDA/GOOGL/MSFT/AMZN/AAPL/AVGO/META. But it **misses the AI Infra + Power sleeve**
+  (VST/BE/CRWV/CEG are not in NANC's top-10) and any brand-new sub-top-10 position until it grows
+  in. Honest consequence: **v1 can only strike on Mega-Cap Core names.** Restoring the power sleeve
+  is exactly what the phase-2 full-file source buys. → Open decision #2.
+- **Weight-only, no share counts.** Reconstruct the price-immune signal:
+  `shares-per-unit_i ≈ weight_i × NANC_close ÷ holding_close_i` — every term is free and daily
+  (`NANC_close` and `holding_close` come straight from `price_history` once NANC is seeded into
+  `securities` as an `etf`). An approximation (NAV≈close, ignores intraday), but fine for a slow,
+  rarity-throttled signal.
+- ⚠️ **Two verifies on the first Railway run:** (a) `quoteSummary` may require a Yahoo crumb+cookie
+  (the v8 chart endpoint `prices.py` uses does not) — if so, do the handshake or use `yfinance`
+  (`Ticker('NANC').funds_data.top_holdings`, which manages it); (b) confirm how often Yahoo actually
+  refreshes the weights (may be weekly, not daily) — **dedup snapshots by content, not pull date**,
+  so a stale repeat isn't misread as "no change."
+
+**Phase 2 — the Tidal full-holdings file (restores the power sleeve + sub-top-10 NEWs).**
+NANC's advisor is **Tidal Investments**; Tidal ETFs publish a full daily holdings file *with real
+share counts* (so no reconstruction needed — `shares`/`fund_shares_out` fill directly). ⚠️ locate
+the canonical Tidal fund-services URL and test from Railway — it may serve directly (like
+Yahoo/Finnhub) or need the Composio proxy (the Shut-In's `COMPOSIO_API_KEY` pattern). Upgrade path,
+not a blocker.
+
+**Historical backfill / validation — SEC N-PORT.** EDGAR is already proven-reachable (Form 4 / 13F).
+N-PORT gives full historical holdings, but quarterly and ~60-day lagged — useless as the live
+signal, good for backtesting the *style* over past quarters.
+
+**All paths:** pull once per trading day, diff against the prior snapshot. The diff is the signal.
 
 ---
 
 ## Proposed data model (gated — not applied)
 
 ```sql
--- Daily full-book snapshot of NANC holdings. One row per (fund, holding, as_of_date).
--- Small: ~106 rows/day. Keep ~400 days so quarter-over-quarter and YoY diffs are possible;
--- this is a signal series, not raw chatter, so retention is longer than market_news.
+-- Daily holdings snapshot of NANC. One row per (fund, holding, as_of_date). Small: ~10 rows/day
+-- under Yahoo v1 (top-10), ~106/day under a phase-2 full-book source. Keep ~400 days so quarter-
+-- over-quarter and YoY diffs are possible; a signal series, not raw chatter, so retention is
+-- longer than market_news.
 create table if not exists etf_holdings (
   id            bigint generated always as identity primary key,
   fund          text not null,                       -- 'NANC' (KRUZ later if wanted)
   ticker        text references securities(ticker),  -- holding symbol (may be null pre-seed)
   as_of_date    date not null,
-  shares          numeric,      -- holding's shares held (6dp, no rounding)
-  fund_shares_out numeric,      -- the ETF's total shares outstanding on as_of_date (same for
-                                --   every row of a snapshot). shares/fund_shares_out = shares-per-
-                                --   unit — THE active-decision field, immune to price & create/redeem.
-  weight_pct      numeric,      -- context only; do NOT signal on this alone (moves with price)
+  weight_pct      numeric,      -- v1 (Yahoo): the holding's weight. shares-per-unit is reconstructed
+                                --   as weight_pct/100 * NANC_close / holding_close (both price_history).
+  shares          numeric,      -- only a full-book source (Tidal/N-PORT) fills these; null under
+  fund_shares_out numeric,      --   Yahoo v1. With real shares, spu = shares/fund_shares_out directly.
   market_value    numeric,
   ingested_at     timestamptz default now(),
   unique (fund, ticker, as_of_date)
@@ -195,15 +217,24 @@ create index if not exists idx_etf_holdings_ticker on etf_holdings(ticker, as_of
 
 -- Snapshot-over-snapshot change in SHARES-PER-UNIT per holding (immune to price & create/redeem).
 -- This is the diff that becomes an Oracle candidate. NEW = position appeared; EXITED = disappeared.
+-- spu prefers real shares (full-book source); under Yahoo v1 it is reconstructed from weight and
+-- the daily closes of the holding and of NANC itself (seeded in securities -> price_history).
 create or replace view etf_holdings_delta with (security_invoker = true) as
-with snaps as (
-  select fund, ticker, as_of_date, shares, weight_pct,
-         shares / nullif(fund_shares_out, 0)                          as spu,   -- shares per unit
-         lag(shares / nullif(fund_shares_out, 0))
-           over (partition by fund, ticker order by as_of_date)       as prev_spu,
-         lag(as_of_date)
-           over (partition by fund, ticker order by as_of_date)       as prev_date
-  from etf_holdings
+with priced as (
+  select h.fund, h.ticker, h.as_of_date, h.weight_pct,
+         coalesce(
+           h.shares / nullif(h.fund_shares_out, 0),                              -- full-book: exact
+           (h.weight_pct / 100.0) * nf.close / nullif(hp.close, 0)               -- Yahoo v1: recon
+         )                                                             as spu
+  from etf_holdings h
+  left join price_history hp on hp.ticker = h.ticker and hp.date = h.as_of_date  -- holding close
+  left join price_history nf on nf.ticker = h.fund   and nf.date = h.as_of_date  -- NANC close (NAV proxy)
+),
+snaps as (
+  select fund, ticker, as_of_date, weight_pct, spu,
+         lag(spu)        over (partition by fund, ticker order by as_of_date)     as prev_spu,
+         lag(as_of_date) over (partition by fund, ticker order by as_of_date)     as prev_date
+  from priced
 )
 select
   fund, ticker, as_of_date, prev_date, weight_pct, spu, prev_spu,
@@ -244,8 +275,10 @@ order by d.as_of_date desc, d.weight_pct desc;
 
 The Oracle rejoins the standard path with **no new simulator work**:
 
-1. `ingest/etf_holdings.py` (new) — daily snapshot into `etf_holdings` (Finnhub or Composio),
-   writes an `ingest_runs` audit row like every other feed.
+1. `ingest/etf_holdings.py` (new) — daily Yahoo `topHoldings` snapshot into `etf_holdings`, same
+   `urllib` + browser-UA pattern as `prices.py`. Also **seed NANC into `securities`**
+   (`asset_type='etf'`) so `prices.py` pulls its daily close — the NAV proxy the delta view needs
+   for shares-per-unit reconstruction. Writes an `ingest_runs` audit row like every feed.
 2. `ingest/map_personas.py` — add a `map_oracle()` that reads `the_oracle_candidates` (Gates 1-3),
    **applies Gate 4** (z-score the survivors, add the NEW bump, keep **top-1 per snapshot**, drop any
    ticker struck within the **10-trading-day cooldown**), then emits one `persona_trades` row per
@@ -279,8 +312,12 @@ The Oracle rejoins the standard path with **no new simulator work**:
 
 1. **Framing:** Option B (recommended — NANC as universe, Oracle selectivity as filter) vs A
    (full reposition) vs C (new persona, leave Oracle alone). Everything below assumes B.
-2. **Feed:** confirm Finnhub `/etf/holdings` tier on Railway; if premium, accept Composio-proxy
-   fallback (and find the canonical issuer holdings URL).
+2. **Feed & coverage — the one real trade-off.** Finnhub is premium (out). v1 = Yahoo
+   `topHoldings` (free, proven) but **top-10 only → strikes limited to the Mega-Cap Core sleeve;
+   the AI Infra + Power names (VST/BE/CRWV/CEG) are invisible until the phase-2 Tidal full-file**.
+   Decide: ship v1 at that reduced scope now, or block on standing up the Tidal full-file first?
+   (Recommend: ship v1 — it unblocks a real backtest; add Tidal when the power sleeve matters.)
+   Also verify the Yahoo crumb + refresh cadence on the first Railway run.
 3. **"Strike" thresholds (starting values proposed, tune before trusting):** Gate 3 add =
    `Δ shares-per-unit ≥ +20%` & `weight_pct ≥ 1.0%`; Gate 4 = top-1/snapshot + 10-trading-day
    cooldown; conviction weights `0.5/0.3/0.2`. Calibrate so the Oracle fires ~a handful of
